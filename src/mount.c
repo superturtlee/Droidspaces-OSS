@@ -565,7 +565,6 @@ int setup_dev(const char *rootfs, int hw_access, int gpu_mode,
 
 int create_devices(const char *rootfs, int hw_access, int privileged_mask) {
   (void)hw_access;
-  (void)privileged_mask;
   const struct {
     const char *name;
     mode_t mode;
@@ -630,11 +629,16 @@ int create_devices(const char *rootfs, int hw_access, int privileged_mask) {
   /* 4. Create /dev/tty1-N as symlinks to /dev/null.
    * For non-systemd inits (openrc, busybox): silences "can't open /dev/ttyN"
    * log spam -- the node exists, agetty opens /dev/null and exits cleanly.
+   *
+   * Skip in privileged+unfiltered-dev mode: devtmpfs already provides real
+   * ttyN char device nodes and we must not clobber them with symlinks.
    */
-  for (int i = 1; i <= DS_MAX_TTYS; i++) {
-    snprintf(path, sizeof(path), "%s/dev/tty%d", rootfs, i);
-    force_unlink(path);
-    symlink("/dev/null", path);
+  if (!(privileged_mask & DS_PRIV_UNFILTERED)) {
+    for (int i = 1; i <= DS_MAX_TTYS; i++) {
+      snprintf(path, sizeof(path), "%s/dev/tty%d", rootfs, i);
+      force_unlink(path);
+      symlink("/dev/null", path);
+    }
   }
   /* Standard symlinks */
   char tgt[PATH_MAX];
