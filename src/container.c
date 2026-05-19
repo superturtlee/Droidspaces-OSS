@@ -459,7 +459,21 @@ int start_rootfs(struct ds_config *cfg) {
     goto cleanup;
   }
 
-  generate_uuid(cfg->uuid, sizeof(cfg->uuid));
+  {
+    char active_uuids[DS_MAX_CONTAINERS][DS_UUID_LEN + 1];
+    int uuid_count = collect_active_uuids(active_uuids, DS_MAX_CONTAINERS);
+    int need_new = (cfg->uuid[0] == '\0');
+    if (!need_new) {
+      for (int _i = 0; _i < uuid_count; _i++) {
+        if (strcmp(cfg->uuid, active_uuids[_i]) == 0) {
+          need_new = 1;
+          break;
+        }
+      }
+    }
+    if (need_new)
+      generate_uuid(cfg->uuid, sizeof(cfg->uuid));
+  }
 
   /* Resolve and lock in the container's static NAT IP before the first save.
    *
