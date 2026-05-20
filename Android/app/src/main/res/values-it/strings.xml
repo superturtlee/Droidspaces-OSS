@@ -161,8 +161,8 @@
     <string name="cat_security">Sicurezza &amp; Avvio</string>
     <string name="cat_advanced">Opzioni Avanzate</string>
     <string name="network_mode">Modalità di rete</string>
-    <string name="network_mode_host">Host (Predefinita)</string>
-    <string name="network_mode_nat">NAT (Isolata)</string>
+    <string name="network_mode_host">Host</string>
+    <string name="network_mode_nat">NAT (Predefinita)</string>
     <string name="network_mode_none">Nessuna (Air-gapped)</string>
     <string name="nat_settings">Impostazioni NAT</string>
     <string name="upstream_interfaces_mandatory">Interfacce Upstream (Obbligatorie)</string>
@@ -191,7 +191,7 @@
     <string name="saving">Salvataggio in corso...</string>
     <string name="save_changes">Salva modifiche</string>
     <string name="static_ip_address">Indirizzo IP statico</string>
-    <string name="static_ip_description">Imposta un IPv4 statico per questo contenitore nella subnet 172.28.x.x.</string>
+    <string name="static_ip_description">Imposta un IPv4 statico per questo contenitore nella subnet 172.28.x.x. Lascia vuoto per l\'assegnazione automatica al primo avvio.</string>
     <string name="octet_label">Ottetto %1$d</string>
     <string name="error_octet_range">Intervallo: 1-254</string>
     <string name="error_ip_collision">Questo IP è già assegnato a \"%1$s\"</string>

@@ -145,8 +145,8 @@
     <string name="cat_security">Keamanan &amp; Boot</string>
     <string name="cat_advanced">Opsi Lanjutan</string>
     <string name="network_mode">Mode Jaringan</string>
-    <string name="network_mode_host">Host (Default)</string>
-    <string name="network_mode_nat">NAT (Terisolasi)</string>
+    <string name="network_mode_host">Host</string>
+    <string name="network_mode_nat">NAT (Default)</string>
     <string name="network_mode_none">Tidak ada (terisolasi secara fisik)</string>
     <string name="nat_settings">Pengaturan NAT</string>
     <string name="upstream_interfaces_mandatory">Antarmuka Upstream (Wajib)</string>
@@ -174,7 +174,7 @@
     <string name="saving">Menyimpan...</string>
     <string name="save_changes">Simpan Perubahan</string>
     <string name="static_ip_address">Alamat IP Statis</string>
-    <string name="static_ip_description">Tetapkan alamat IPv4 statis untuk kontainer ini dalam subnet 172.28.x.x.</string>
+    <string name="static_ip_description">Tetapkan alamat IPv4 statis untuk kontainer ini dalam subnet 172.28.x.x. Biarkan kosong untuk menetapkan secara otomatis pada booting pertama.</string>
     <string name="error_octet_range">Rentang: 1–254</string>
     <string name="error_ip_collision">Alamat IP ini sudah ditetapkan untuk “%1$s”</string>
     <string name="failed_to_update_config">Gagal untuk mengupdate konfigurasi</string>

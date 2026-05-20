@@ -136,8 +136,8 @@
     <string name="cat_networking">网络</string>
     <string name="cat_advanced">高级选项</string>
     <string name="network_mode">网络模式</string>
-    <string name="network_mode_host">主机（默认）</string>
-    <string name="network_mode_nat">NAT（隔离）</string>
+    <string name="network_mode_host">主机</string>
+    <string name="network_mode_nat">NAT（默认）</string>
     <string name="network_mode_none">无（完全隔离）</string>
     <string name="nat_settings">NAT 设置</string>
     <string name="upstream_interfaces_mandatory">上游网络接口（必填）</string>
@@ -166,7 +166,7 @@
     <string name="saving">正在保存...</string>
     <string name="save_changes">保存更改</string>
     <string name="static_ip_address">静态 IP 地址</string>
-    <string name="static_ip_description">为此容器设置一个 172.28.x.x 子网内的静态 IPv4 地址。</string>
+    <string name="static_ip_description">为此容器设置一个 172.28.x.x 子网内的静态 IPv4 地址。留空以在首次启动时自动分配。</string>
     <string name="storage_configuration">存储配置</string>
     <string name="migrate_dialog_message">将“%1$s”迁移至稀疏镜像会创建一个专用的 ext4 文件系统。操作中断将导致数据损坏，请务必备份您的数据。</string>
     <string name="help_card_title">首次使用 Droidspaces？</string>

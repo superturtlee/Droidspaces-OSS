@@ -23,7 +23,7 @@ class ContainerInstallationViewModel : ViewModel() {
     var hostname: String by mutableStateOf("")
         private set
 
-    var netMode: String by mutableStateOf("host")
+    var netMode: String by mutableStateOf("nat")
         private set
 
     var disableIPv6: Boolean by mutableStateOf(false)
@@ -183,7 +183,7 @@ class ContainerInstallationViewModel : ViewModel() {
         tarballUri = null
         containerName = ""
         hostname = ""
-        netMode = "host"
+        netMode = "nat"
         disableIPv6 = false
         enableAndroidStorage = false
         enableHwAccess = false

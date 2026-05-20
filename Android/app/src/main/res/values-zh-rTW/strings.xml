@@ -58,7 +58,7 @@
     <string name="about_section">關於</string>
     <string name="ipv6_option">停用 IPv6</string>
     <string name="symmetric_label">（對稱）</string>
-    <string name="static_ip_description">為此容器設定一個172.28.xx 子網路內的靜態IPv4 位址。</string>
+    <string name="static_ip_description">為此容器設定一個 172.28.x.x 子網路內的靜態 IPv4 位址。留空以在首次啟動時自動分配。</string>
     <string name="gpu_access_description">將 GPU 節點鏡像到隔離的 /dev 目錄（不進行完整的硬體直通）</string>
     <string name="clear">清除</string>
     <string name="systemd_not_available">Systemd 不可用</string>
@@ -154,14 +154,14 @@
     <string name="check_root_access">檢查Root權限</string>
     <string name="container_path">容器路徑：%1$s</string>
     <string name="installation_failed">安裝失敗</string>
-    <string name="network_mode_nat">NAT（隔離）</string>
+    <string name="network_mode_nat">NAT（預設）</string>
     <string name="unknown_error">發生未知錯誤</string>
     <string name="environment_variables">環境變數</string>
     <string name="no_static_services">沒有靜態服務</string>
     <string name="contributors">貢獻者</string>
     <string name="dark_theme_description">開啟深色模式</string>
     <string name="operation_failed">操作失敗！</string>
-    <string name="network_mode_host">主機（預設）</string>
+    <string name="network_mode_host">主機</string>
     <string name="protocol">協定</string>
     <string name="add_port_forward">新增連接埠轉發</string>
     <string name="restart">重啟</string>

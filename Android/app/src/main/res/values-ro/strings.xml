@@ -126,8 +126,8 @@
     <string name="cat_security">Securitate &amp; execuție</string>
     <string name="cat_advanced">Opțiuni avansate</string>
     <string name="network_mode">Modul de rețea</string>
-    <string name="network_mode_host">Gazdă (implicit)</string>
-    <string name="network_mode_nat">NAT (Izolat)</string>
+    <string name="network_mode_host">Gazdă</string>
+    <string name="network_mode_nat">NAT (implicit)</string>
     <string name="network_mode_none">Niciunul (fără nicio conexiune la rețea)</string>
     <string name="nat_settings">Setări NAT</string>
     <string name="upstream_interfaces_mandatory">Interfețe de uplink (obligatorii)</string>
@@ -154,7 +154,7 @@
     <string name="saving">Se salvează...</string>
     <string name="save_changes">Salvează schimbările</string>
     <string name="static_ip_address">Adresă IP statică</string>
-    <string name="static_ip_description">Setează o adresă IPv4 statică pentru acest container în subnet-ul 172.28.x.x.</string>
+    <string name="static_ip_description">Setează o adresă IPv4 statică pentru acest container în subnet-ul 172.28.x.x. Lasă gol pentru auto-alocare la prima pornire.</string>
     <string name="octet_label">Octetul %1$d</string>
     <string name="error_octet_range">Interval: 1-254</string>
     <string name="error_ip_collision">Acest IP este deja atribuit la \"%1$s\"</string>

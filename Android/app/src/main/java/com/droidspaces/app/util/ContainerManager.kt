@@ -28,7 +28,7 @@ data class ContainerInfo(
     val name: String,
     val hostname: String,
     val rootfsPath: String,
-    val netMode: String = "host",
+    val netMode: String = "nat",
     val disableIPv6: Boolean = false,
     val enableAndroidStorage: Boolean = false,
     val enableHwAccess: Boolean = false,

@@ -207,8 +207,8 @@
     <string name="cat_security">Security &amp; Boot</string>
     <string name="cat_advanced">Advanced Options</string>
     <string name="network_mode">Network Mode</string>
-    <string name="network_mode_host">Host (Default)</string>
-    <string name="network_mode_nat">NAT (Isolated)</string>
+    <string name="network_mode_host">Host</string>
+    <string name="network_mode_nat">NAT (Default)</string>
     <string name="network_mode_none">None (Air-gapped)</string>
     <string name="network_mode_host_short">Host</string>
     <string name="network_mode_nat_short">NAT</string>
@@ -240,7 +240,7 @@
     <string name="saving">Saving...</string>
     <string name="save_changes">Save Changes</string>
     <string name="static_ip_address">Static IP Address</string>
-    <string name="static_ip_description">Set a static IPv4 for this container within the 172.28.x.x subnet.</string>
+    <string name="static_ip_description">Set a static IPv4 for this container within the 172.28.x.x subnet. Leave it empty to auto-assign at first boot.</string>
     <string name="octet_label">Octet %1$d</string>
     <string name="error_octet_range">Range: 1-254</string>
     <string name="error_ip_collision">This IP is already assigned to \"%1$s\"</string>

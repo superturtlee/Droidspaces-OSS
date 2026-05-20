@@ -178,7 +178,7 @@
     <string name="saving">Kaydediliyor...</string>
     <string name="save_changes">Değişiklikleri Kaydet</string>
     <string name="static_ip_address">Statik IP Adresi</string>
-    <string name="static_ip_description">Bu konteyner için 172.28.x.x alt ağı içinde statik bir IPv4 adresi ayarlayın.</string>
+    <string name="static_ip_description">Bu konteyner için 172.28.x.x alt ağı içinde statik bir IPv4 adresi ayarlayın. İlk açılışta otomatik atama için boş bırakın.</string>
     <string name="octet_label">Sekizli %1$d</string>
     <string name="error_octet_range">Aralık: 1-254</string>
     <string name="error_ip_collision">Bu IP adresi halihazırda “%1$s”e atanmış durumda</string>

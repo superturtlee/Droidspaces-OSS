@@ -137,8 +137,8 @@
     <string name="cat_security">ආරක්ෂාව සහ පද්ධති පණගැන්වීම</string>
     <string name="cat_advanced">වැඩිදුර සැකසුම්</string>
     <string name="network_mode">ජාල ක්‍රමය</string>
-    <string name="network_mode_host">Host (පෙරනිමිය)</string>
-    <string name="network_mode_nat">NAT (හුදෙකලා)</string>
+    <string name="network_mode_host">Host</string>
+    <string name="network_mode_nat">NAT (පෙරනිමිය)</string>
     <string name="network_mode_none">කිසිවක් නැත (Air-gapped)</string>
     <string name="nat_settings">NAT සැකසුම්</string>
     <string name="upstream_interfaces_mandatory">ප්‍රභව අතුරුමුහුණත් (අනිවාර්ය)</string>
@@ -167,7 +167,7 @@
     <string name="saving">සුරකිමින් පවතී...</string>
     <string name="save_changes">වෙනස්කම් සුරකින්න</string>
     <string name="static_ip_address">ස්ථාවර IP ලිපිනය</string>
-    <string name="static_ip_description">මෙම කන්ටේනරය සඳහා 172.28.x.x උපජාලය තුළ ස්ථාවර IPv4 ලිපිනයක් සකසන්න.</string>
+    <string name="static_ip_description">මෙම කන්ටේනරය සඳහා 172.28.x.x උපජාලය තුළ ස්ථාවර IPv4 ලිපිනයක් සකසන්න. පළමු පණගැන්වීමේදී ස්වයංක්‍රීයව ලිපිනයක් ලබා ගැනීමට මෙය හිස්ව තබන්න.</string>
     <string name="octet_label">Octet %1$d</string>
     <string name="error_octet_range">පරාසය: 1-254</string>
     <string name="error_ip_collision">මෙම IP ලිපිනය දැනටමත් \"%1$s\" වෙත ලබා දී ඇත</string>

@@ -562,7 +562,7 @@ fun EditContainerScreen(
             DsDropdown(
                 label = context.getString(R.string.network_mode),
                 selected = netMode,
-                options = listOf("host", "nat", "none"),
+                options = listOf("nat", "host", "none"),
                 displayName = { context.getString(when (it) { "nat" -> R.string.network_mode_nat; "none" -> R.string.network_mode_none; else -> R.string.network_mode_host }) },
                 onSelect = { mode -> clearFocus(); netMode = mode; if (mode != "host") disableIPv6 = false },
                 leadingIcon = Icons.Default.Public

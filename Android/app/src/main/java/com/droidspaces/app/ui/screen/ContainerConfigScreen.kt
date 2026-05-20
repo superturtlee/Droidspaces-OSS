@@ -52,7 +52,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ContainerConfigScreen(
-    initialNetMode: String = "host",
+    initialNetMode: String = "nat",
     initialDisableIPv6: Boolean = false,
     initialEnableAndroidStorage: Boolean = false,
     initialEnableHwAccess: Boolean = false,
@@ -337,7 +337,7 @@ fun ContainerConfigScreen(
             DsDropdown(
                 label = context.getString(R.string.network_mode),
                 selected = netMode,
-                options = listOf("host", "nat", "none"),
+                options = listOf("nat", "host", "none"),
                 displayName = { context.getString(when (it) { "nat" -> R.string.network_mode_nat; "none" -> R.string.network_mode_none; else -> R.string.network_mode_host }) },
                 onSelect = { mode -> netMode = mode; if (mode != "host") disableIPv6 = false },
                 leadingIcon = Icons.Default.Public

@@ -135,7 +135,7 @@
     <string name="cat_security">セキュリティと起動</string>
     <string name="cat_advanced">高度な設定</string>
     <string name="network_mode">ネットワークモード</string>
-    <string name="network_mode_host">ホスト (既定)</string>
+    <string name="network_mode_host">ホスト</string>
     <string name="port_forwarding">ポート転送</string>
     <string name="add_port_forward">ポート転送を追加</string>
     <string name="host_port_hint">ホスト側ポート (1-65535 あるいは 100-200 の範囲)</string>
@@ -220,7 +220,7 @@
     <string name="uninstall">アンインストール</string>
     <string name="disable_ipv6_description">このコンテナでIPv6を無効にします。IPv6を無効にするとホストで実行中のVPNアプリが壊れるかもしれません。</string>
     <string name="cat_networking">ネットワーク設定</string>
-    <string name="network_mode_nat">ネットワークアドレス変換 (分離)</string>
+    <string name="network_mode_nat">ネットワークアドレス変換 (既定)</string>
     <string name="nat_settings">ネットワークアドレス変換設定</string>
     <string name="symmetric_label">(対称)</string>
     <string name="reboot_recommended">SELinuxのルールを適用し、起動時にデーモンを開始する為に再起動が推奨されます。</string>
@@ -265,7 +265,7 @@
     <string name="error_port_overlap">既存のポート転送ルールと重なっています</string>
     <string name="symlink_integration_description">/system/bin にシンボリックリンクを作成し、Androidのルート権限シェルからドロイドスペースのコマンドを利用可能にする。警告: OVERLAYFSメタ・モジュールであるマウント・システムでこの機能を有効にすると、ブートループが発生します。この選択肢はマジック・マウント系のマウント・システムを使っている場合にのみ使ってください。(再起動が必要です)</string>
     <string name="about_section">このアプリについて</string>
-    <string name="static_ip_description">172.28.x.x サブネット内で、このコンテナに対して静的IPv4を設定する。</string>
+    <string name="static_ip_description">172.28.x.x サブネット内で、このコンテナに対して静的IPv4を設定する。最初の起動時に自動割り当てするには空欄のままにしてください。</string>
     <string name="octet_label">オクテット %1$d</string>
     <string name="error_octet_range">範囲: 1-254</string>
     <string name="error_ip_collision">このIPアドレスは既に「%1$s」に割当られています</string>
