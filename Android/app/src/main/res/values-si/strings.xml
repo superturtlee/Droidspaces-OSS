@@ -221,9 +221,12 @@
     <string name="no_containers_running">කිසිඳු කන්ටේනරයක් ධාවනය නොවේ</string>
     <string name="start_container_first">මෙතන බලන්න මුලින්ම කන්ටේනරයක් ආරම්භ කරන්න</string>
     <string name="systemd_services">Systemd සේවා</string>
+    <string name="openrc_services">OpenRC සේවා</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Init පද්ධතිය</string>
+    <string name="init_system_not_available">Systemd/OpenRC නොමැත</string>
+    <string name="init_system_not_available_desc">මෙම කන්ටේනරයේ systemd හෝ OpenRC ස්ථාපනය වී නොමැත</string>
     <string name="fetching_services">සේවා විස්තර ලබා ගනිමින්...</string>
-    <string name="systemd_not_available">Systemd සොයාගත නොහැක</string>
-    <string name="systemd_not_available_desc">මෙම කන්ටේනරයේ systemd ස්ථාපනය කර හෝ ක්‍රියාත්මක වී නොමැත</string>
     <string name="search_services">සේවා සොයන්න...</string>
     <string name="enabled_legend">සක්‍රීය කළ</string>
     <string name="disabled_legend">අක්‍රීය කළ</string>

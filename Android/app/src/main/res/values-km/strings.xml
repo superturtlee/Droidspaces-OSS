@@ -297,9 +297,12 @@
     <string name="sessions_running_plural">កំពុងដំណើរការវគ្គ %1$d · ចុចដើម្បីស្ដារ</string>
     <string name="session_running_singular">កំពុងដំណើរការវគ្គចំនួន 1 · ចុចដើម្បីស្ដារ</string>
     <string name="systemd_services">សេវាកម្មប្រព័ន្ធ</string>
+    <string name="openrc_services">សេវាកម្ម OpenRC</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">ប្រព័ន្ធ Init</string>
+    <string name="init_system_not_available">មិនអាចប្រើប្រព័ន្ធ Systemd/OpenRC បានទេ</string>
+    <string name="init_system_not_available_desc">កុងតឺន័រនេះមិនមាន systemd ឬ OpenRC ដែលបានដំឡើងទេ</string>
     <string name="fetching_services">កំពុងទាញយកសេវាកម្ម...</string>
-    <string name="systemd_not_available">ប្រព័ន្ធមិនអាចប្រើបានទេ</string>
-    <string name="systemd_not_available_desc">កុងតឺន័រនេះមិនមាន systemd ដែលបានដំឡើង ឬកំពុងដំណើរការទេ</string>
     <string name="search_services">ស្វែងរកសេវាកម្ម...</string>
     <string name="enabled_legend">បានបើកដំណើរការ</string>
     <string name="disabled_legend">បានបិទ</string>

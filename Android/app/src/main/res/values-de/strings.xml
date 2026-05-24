@@ -173,9 +173,13 @@
     <string name="start_container_first">Starten Sie zuerst einen Container, um ihn hier zu sehen</string>
     <!-- Systemd Screen -->
     <string name="systemd_services">Systemd-Dienste</string>
+    <string name="openrc_services">OpenRC-Dienste</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Init-System</string>
+    <string name="init_system_not_available">Systemd/OpenRC nicht verfügbar</string>
+    <string name="init_system_not_available_desc">Dieser Container hat weder systemd noch OpenRC installiert</string>
     <string name="fetching_services">Dienste werden abgerufen...</string>
-    <string name="systemd_not_available">Systemd nicht verfügbar</string>
-    <string name="systemd_not_available_desc">Dieser Container hat kein installiertes oder laufendes systemd</string>
+
     <string name="search_services">Dienste durchsuchen...</string>
     <string name="enabled_legend">Aktiviert</string>
     <string name="disabled_legend">Deaktiviert</string>

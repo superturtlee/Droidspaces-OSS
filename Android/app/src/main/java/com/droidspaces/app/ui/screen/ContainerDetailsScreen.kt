@@ -24,6 +24,7 @@ import com.droidspaces.app.ui.component.ContainerUsersCard
 import com.droidspaces.app.util.ContainerInfo
 import com.droidspaces.app.util.ContainerOSInfoManager
 import com.droidspaces.app.util.ContainerSystemdManager
+import com.droidspaces.app.util.ContainerOpenRCManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.droidspaces.app.util.AnimationUtils
@@ -55,7 +56,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 fun ContainerDetailsScreen(
     container: ContainerInfo,
     onNavigateBack: () -> Unit,
-    onNavigateToSystemd: () -> Unit = {},
+    onNavigateToServices: (InitSystem) -> Unit = {},
     onNavigateToTerminal: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -68,16 +69,17 @@ fun ContainerDetailsScreen(
         mutableStateOf(ContainerOSInfoManager.getCachedOSInfo(container.name, context))
     }
 
-    // Systemd state - stabilized to prevent mid-refresh changes
-    var systemdState by remember { mutableStateOf<SystemdCardState>(SystemdCardState.Checking) }
+    // Init system state - detect systemd first, then OpenRC
+    var initSystemState by remember { mutableStateOf<InitSystemCardState>(InitSystemCardState.Checking) }
 
-    // Background systemd check - happens once per container load
     LaunchedEffect(container.name) {
-        val isAvailable = ContainerSystemdManager.isSystemdAvailable(container.name)
-        systemdState = if (isAvailable) {
-            SystemdCardState.Available
-        } else {
-            SystemdCardState.NotAvailable
+        initSystemState = when {
+            ContainerSystemdManager.isSystemdAvailable(container.name) ->
+                InitSystemCardState.Available(InitSystem.SYSTEMD)
+            ContainerOpenRCManager.isOpenRCAvailable(container.name) ->
+                InitSystemCardState.Available(InitSystem.OPENRC)
+            else ->
+                InitSystemCardState.NotAvailable
         }
     }
 
@@ -214,9 +216,9 @@ fun ContainerDetailsScreen(
             }
 
             item(key = "systemd_${container.name}") {
-                PremiumSystemdCard(
-                    state = systemdState,
-                    onNavigateToSystemd = onNavigateToSystemd
+                PremiumInitSystemCard(
+                    state = initSystemState,
+                    onNavigateToServices = onNavigateToServices
                 )
             }
         }
@@ -224,12 +226,17 @@ fun ContainerDetailsScreen(
 }
 
 /**
- * Systemd card state - sealed for type safety and stability
+ * Which init system is available in the container.
  */
-private sealed class SystemdCardState {
-    data object Checking : SystemdCardState()
-    data object Available : SystemdCardState()
-    data object NotAvailable : SystemdCardState()
+enum class InitSystem { SYSTEMD, OPENRC }
+
+/**
+ * Init system card state - sealed for type safety and stability
+ */
+private sealed class InitSystemCardState {
+    data object Checking : InitSystemCardState()
+    data class Available(val initSystem: InitSystem) : InitSystemCardState()
+    data object NotAvailable : InitSystemCardState()
 }
 
 /**
@@ -414,44 +421,41 @@ private fun TerminalCard(
 }
 
 /**
- * PREMIUM SYSTEMD CARD - Zero glitches, buttery smooth
- *
- * Key features:
- * - Fixed height prevents layout shifts during pull-to-refresh
- * - CrossFade for smooth state transitions (200ms)
- * - Pre-computed button widths prevent text changes from causing jumps
- * - Hardware-accelerated animations
+ * PREMIUM INIT SYSTEM CARD - handles Systemd, OpenRC, and unavailable states.
  */
 @Composable
-private fun PremiumSystemdCard(
-    state: SystemdCardState,
-    onNavigateToSystemd: () -> Unit,
+private fun PremiumInitSystemCard(
+    state: InitSystemCardState,
+    onNavigateToServices: (InitSystem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    // Fade-in animation
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        visible = true
-    }
+    LaunchedEffect(Unit) { visible = true }
 
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
         animationSpec = AnimationUtils.cardFadeSpec(),
-        label = "systemd_fade"
+        label = "initsystem_fade"
     )
+
+    val cardTitle = when (state) {
+        is InitSystemCardState.Available -> when (state.initSystem) {
+            InitSystem.SYSTEMD -> context.getString(R.string.systemd)
+            InitSystem.OPENRC -> context.getString(R.string.openrc)
+        }
+        else -> context.getString(R.string.init_system)
+    }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 88.dp)
             .alpha(alpha)
-            .graphicsLayer {
-                this.alpha = alpha
-            },
+            .graphicsLayer { this.alpha = alpha },
         shape = RoundedCornerShape(20.dp),
         color = when (state) {
-            is SystemdCardState.Available -> MaterialTheme.colorScheme.surfaceContainerHigh
+            is InitSystemCardState.Available -> MaterialTheme.colorScheme.surfaceContainerHigh
             else -> MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.5f)
         },
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -463,7 +467,6 @@ private fun PremiumSystemdCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon + Title
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -471,33 +474,32 @@ private fun PremiumSystemdCard(
             ) {
                 Icon(
                     imageVector = when (state) {
-                        is SystemdCardState.Available -> Icons.Default.Settings
-                        is SystemdCardState.NotAvailable -> Icons.Default.Block
-                        is SystemdCardState.Checking -> Icons.Default.HourglassEmpty
+                        is InitSystemCardState.Available -> Icons.Default.Settings
+                        is InitSystemCardState.NotAvailable -> Icons.Default.Block
+                        is InitSystemCardState.Checking -> Icons.Default.HourglassEmpty
                     },
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                     tint = when (state) {
-                        is SystemdCardState.Available -> MaterialTheme.colorScheme.primary
+                        is InitSystemCardState.Available -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
                 Text(
-                    text = context.getString(R.string.systemd),
+                    text = cardTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            // Button with CrossFade for smooth transitions - NO GLITCHES
             Crossfade(
                 targetState = state,
                 animationSpec = AnimationUtils.mediumSpec(),
-                label = "systemd_button_transition"
+                label = "initsystem_button_transition"
             ) { currentState ->
                 when (currentState) {
-                    is SystemdCardState.Checking -> {
+                    is InitSystemCardState.Checking -> {
                         FilledTonalButton(
                             onClick = {},
                             enabled = false,
@@ -511,15 +513,12 @@ private fun PremiumSystemdCard(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                LoadingIndicator(
-                                    size = LoadingSize.Small,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                LoadingIndicator(size = LoadingSize.Small, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(context.getString(R.string.checking))
                             }
                         }
                     }
-                    is SystemdCardState.NotAvailable -> {
+                    is InitSystemCardState.NotAvailable -> {
                         FilledTonalButton(
                             onClick = {},
                             enabled = false,
@@ -532,25 +531,18 @@ private fun PremiumSystemdCard(
                             Text(context.getString(R.string.not_available))
                         }
                     }
-                    is SystemdCardState.Available -> {
+                    is InitSystemCardState.Available -> {
                         Button(
-                            onClick = onNavigateToSystemd,
+                            onClick = { onNavigateToServices(currentState.initSystem) },
                             modifier = Modifier.widthIn(min = 140.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             )
                         ) {
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(
-                                context.getString(R.string.manage),
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Text(context.getString(R.string.manage), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

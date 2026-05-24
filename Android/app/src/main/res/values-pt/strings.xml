@@ -149,9 +149,13 @@
     <string name="no_containers_running">Nenhum contentor em execução</string>
     <string name="start_container_first">Inicie um contentor primeiro para vê-lo aqui</string>
     <string name="systemd_services">Serviços Systemd</string>
+    <string name="openrc_services">Serviços OpenRC</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Sistema de Init</string>
+    <string name="init_system_not_available">Systemd/OpenRC indisponível</string>
+    <string name="init_system_not_available_desc">Este contêner não tem systemd ou OpenRC instalado</string>
     <string name="fetching_services">A buscar serviços...</string>
-    <string name="systemd_not_available">Systemd Não Disponível</string>
-    <string name="systemd_not_available_desc">Este contentor não tem systemd instalado ou em execução</string>
+
     <string name="search_services">Pesquisar serviços...</string>
     <string name="enabled_legend">Ativado</string>
     <string name="disabled_legend">Desativado</string>

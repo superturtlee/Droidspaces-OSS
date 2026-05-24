@@ -170,9 +170,12 @@
     <string name="start_container_first">Magsimula muna ng container upang makita ito dito</string>
 
     <string name="systemd_services">Mga Serbisyo ng Systemd</string>
+    <string name="openrc_services">Mga Serbisyo ng OpenRC</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Init System</string>
+    <string name="init_system_not_available">Hindi Available ang Systemd/OpenRC</string>
+    <string name="init_system_not_available_desc">Ang container na ito ay walang naka-install o gumaganang systemd o OpenRC</string>
     <string name="fetching_services">Kinukuha ang mga serbisyo...</string>
-    <string name="systemd_not_available">Hindi Available ang Systemd</string>
-    <string name="systemd_not_available_desc">Ang container na ito ay walang naka-install o gumaganang systemd</string>
     <string name="search_services">Maghanap ng mga serbisyo...</string>
     <string name="enabled_legend">Naka-enable</string>
     <string name="disabled_legend">Naka-disable</string>

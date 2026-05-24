@@ -178,8 +178,13 @@
     <string name="no_containers_running">実行中のコンテナはありません</string>
     <string name="start_container_first">コンテナを先に始動すると、ここに表示されます</string>
     <string name="systemd_services">Systemdサービス</string>
+    <string name="openrc_services">OpenRC サービス</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Init システム</string>
+    <string name="init_system_not_available">Systemd/OpenRC は利用できません</string>
+    <string name="init_system_not_available_desc">このコンテナには systemd も OpenRC もインストールされていません</string>
     <string name="fetching_services">サービスを取得中...</string>
-    <string name="systemd_not_available_desc">このコンテナには、systemdがインストールされていないか、実行されていません</string>
+
     <string name="enabled_legend">有効</string>
     <string name="disabled_legend">無効</string>
     <string name="static_legend">静的</string>
@@ -287,7 +292,7 @@
     <string name="hostname_hint">空欄の場合は、コンテナ名がホスト名として流用される</string>
     <string name="next_configuration">次へ: 構築</string>
     <string name="next_storage">次へ: 保存領域</string>
-    <string name="systemd_not_available">Systemdは利用できません</string>
+
     <string name="search_services">サービスを検索…</string>
     <string name="action_successful">%1$sの%2$sに成功せり</string>
     <string name="no_local_users_found">ローカル・ユーザーは見つかりませんでした</string>

@@ -61,7 +61,7 @@
     <string name="static_ip_description">為此容器設定一個 172.28.x.x 子網路內的靜態 IPv4 位址。留空以在首次啟動時自動分配。</string>
     <string name="gpu_access_description">將 GPU 節點鏡像到隔離的 /dev 目錄（不進行完整的硬體直通）</string>
     <string name="clear">清除</string>
-    <string name="systemd_not_available">Systemd 不可用</string>
+
     <string name="unknown">未知</string>
     <string name="error_start_must_be_less_than_end">起始值必須小於結束值</string>
     <string name="error_ports_must_be_numbers">連接埠必須是數字</string>
@@ -273,6 +273,11 @@
     <string name="add">添加</string>
     <string name="module_installation_failed">模組安裝失敗</string>
     <string name="systemd_services">Systemd 服務</string>
+    <string name="openrc_services">OpenRC 服務</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Init 系統</string>
+    <string name="init_system_not_available">Systemd/OpenRC 不可用</string>
+    <string name="init_system_not_available_desc">此容器未安裝或執行 systemd 或 OpenRC</string>
     <string name="requirements">需求檢測</string>
     <string name="hostname_label">主機名稱：%1$s</string>
     <string name="root_unavailable">沒有root權限。</string>
@@ -389,7 +394,7 @@
     <string name="feat_autoboot_title">開機時自動啟動</string>
     <string name="feat_autoboot_desc">即使螢幕鎖定且資料加密，也能在啟動時自動啟動容器。</string>
     <string name="install">安裝</string>
-    <string name="systemd_not_available_desc">此容器未安裝或執行 systemd</string>
+
     <string name="please_wait_hint">請稍候，我們正在處理您的請求…</string>
     <string name="kernel_requirements_nongki">非 GKI 核心需求（≤4.19）</string>
     <string name="kernel_requirements_gki">GKI 核心需求（≥5.4）</string>

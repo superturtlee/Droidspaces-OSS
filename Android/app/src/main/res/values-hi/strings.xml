@@ -171,9 +171,13 @@
     <string name="start_container_first">यहाँ देखने के लिए पहले कंटेनर शुरू करें</string>
     <!-- Systemd Screen -->
     <string name="systemd_services">Systemd सेवाएँ</string>
+    <string name="openrc_services">OpenRC सेवाएँ</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">इनिट सिस्टम</string>
+    <string name="init_system_not_available">Systemd/OpenRC उपलब्ध नहीं</string>
+    <string name="init_system_not_available_desc">इस कंटेनर में systemd या OpenRC स्थापित नहीं है</string>
     <string name="fetching_services">सेवाएँ प्राप्त की जा रही हैं...</string>
-    <string name="systemd_not_available">Systemd उपलब्ध नहीं है</string>
-    <string name="systemd_not_available_desc">इस कंटेनर में systemd इंस्टॉल नहीं है या चल नहीं रहा</string>
+
     <string name="search_services">सेवाएँ खोजें...</string>
     <string name="enabled_legend">सक्रिय</string>
     <string name="disabled_legend">निष्क्रिय</string>

@@ -206,9 +206,13 @@
     <string name="no_containers_running">Niciun container nu este activ</string>
     <string name="start_container_first">Pornește un container pentru a-l vedea aici</string>
     <string name="systemd_services">Serviciile systemd</string>
+    <string name="openrc_services">Serviciile OpenRC</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Sistem Init</string>
+    <string name="init_system_not_available">Systemd/OpenRC indisponibil</string>
+    <string name="init_system_not_available_desc">Acest container nu are systemd sau OpenRC instalat</string>
     <string name="fetching_services">Se preiau serviciile...</string>
-    <string name="systemd_not_available">Systemd nu este disponibil</string>
-    <string name="systemd_not_available_desc">Acest container nu are systemd instalat sau în execuție</string>
+
     <string name="search_services">Caută servicii...</string>
     <string name="enabled_legend">Activat</string>
     <string name="disabled_legend">Dezactivat</string>

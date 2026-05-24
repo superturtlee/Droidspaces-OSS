@@ -232,9 +232,13 @@
     <string name="no_containers_running">Çalışan konteyner yok</string>
     <string name="start_container_first">Burada görebilmek için önce bir konteyner başlatın</string>
     <string name="systemd_services">Systemd Servisleri</string>
+    <string name="openrc_services">OpenRC Servisleri</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Init Sistemi</string>
+    <string name="init_system_not_available">Systemd/OpenRC mevcut değil</string>
+    <string name="init_system_not_available_desc">Bu konteynerde systemd veya OpenRC yüklü değil</string>
     <string name="fetching_services">Hizmetler yükleniyor...</string>
-    <string name="systemd_not_available">Systemd Kullanılamıyor</string>
-    <string name="systemd_not_available_desc">Bu konteynerde systemd yüklü değil veya çalışmıyor</string>
+
     <string name="search_services">Servisleri Ara...</string>
     <string name="enabled_legend">Etkin</string>
     <string name="disabled_legend">Devre Dışı</string>

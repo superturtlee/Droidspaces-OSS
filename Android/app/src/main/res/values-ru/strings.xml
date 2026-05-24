@@ -171,9 +171,13 @@
     <string name="start_container_first">Сначала запустите контейнер, чтобы увидеть его здесь</string>
     <!-- Systemd Screen -->
     <string name="systemd_services">Службы Systemd</string>
+    <string name="openrc_services">Службы OpenRC</string>
+    <string name="openrc">OpenRC</string>
+    <string name="init_system">Система Init</string>
+    <string name="init_system_not_available">Systemd/OpenRC недоступен</string>
+    <string name="init_system_not_available_desc">В этом контейнере не установлен systemd или OpenRC</string>
     <string name="fetching_services">Получение служб...</string>
-    <string name="systemd_not_available">Systemd недоступен</string>
-    <string name="systemd_not_available_desc">В этом контейнере не установлен или не запущен systemd</string>
+
     <string name="search_services">Поиск служб...</string>
     <string name="enabled_legend">Включено</string>
     <string name="disabled_legend">Отключено</string>
