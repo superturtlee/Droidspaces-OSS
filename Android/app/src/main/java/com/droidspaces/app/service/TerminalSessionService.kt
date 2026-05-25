@@ -76,6 +76,7 @@ class TerminalSessionService : Service() {
                                 @Suppress("DEPRECATION")
                                 stopForeground(true)
                             }
+                            notificationManager.cancel(NOTIFICATION_ID)
                             stopSelf()
                         } else {
                             updateNotification()
@@ -98,6 +99,7 @@ class TerminalSessionService : Service() {
                 @Suppress("DEPRECATION")
                 stopForeground(true)
             }
+            notificationManager.cancel(NOTIFICATION_ID)
 
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 sessions.values.forEach { it.finishIfRunning() }
@@ -177,6 +179,7 @@ class TerminalSessionService : Service() {
             if (sessions.isEmpty()) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) stopForeground(STOP_FOREGROUND_REMOVE)
                 else @Suppress("DEPRECATION") stopForeground(true)
+                notificationManager.cancel(NOTIFICATION_ID)
                 stopSelf()
             } else {
                 updateNotification()
@@ -227,6 +230,17 @@ class TerminalSessionService : Service() {
     }
 
     private fun updateNotification() {
+        if (sessions.isEmpty()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            notificationManager.cancel(NOTIFICATION_ID)
+            stopSelf()
+            return
+        }
         notificationManager.notify(NOTIFICATION_ID, buildNotification())
     }
 
