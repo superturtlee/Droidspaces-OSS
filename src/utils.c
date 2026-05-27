@@ -1125,8 +1125,12 @@ static void write_to_log_file(const char *name, const char *component,
     struct stat st;
     if (fstat(pre_opened_fd, &st) == 0 &&
         (size_t)st.st_size >= 2 * 1024 * 1024) {
-      ftruncate(pre_opened_fd, 0);
-      lseek(pre_opened_fd, 0, SEEK_SET);
+      if (ftruncate(pre_opened_fd, 0) < 0) {
+        /* best-effort, ignore */
+      }
+      if (lseek(pre_opened_fd, 0, SEEK_SET) == (off_t)-1) {
+        /* best-effort, ignore */
+      }
     }
     dprintf(pre_opened_fd, "[%04d-%02d-%02d %02d:%02d:%02d.%03ld] [%s] %s\n",
             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,
@@ -1693,7 +1697,7 @@ int show_container_usage(struct ds_config *cfg) {
       continue;
 
     /* check PID namespace */
-    char ns_path[64];
+    char ns_path[PATH_MAX];
     snprintf(ns_path, sizeof(ns_path), "/proc/%s/ns/pid", de->d_name);
     char ns_buf[256] = {0};
     ssize_t r = readlink(ns_path, ns_buf, sizeof(ns_buf) - 1);
@@ -1704,7 +1708,7 @@ int show_container_usage(struct ds_config *cfg) {
       continue;
 
     /* RAM: VmRSS from /proc/<pid>/status */
-    char status_path[64];
+    char status_path[PATH_MAX];
     snprintf(status_path, sizeof(status_path), "/proc/%s/status", de->d_name);
     FILE *sf = fopen(status_path, "r");
     if (sf) {
@@ -1721,7 +1725,7 @@ int show_container_usage(struct ds_config *cfg) {
     }
 
     /* CPU sample 1: utime+stime from /proc/<pid>/stat fields 14+15 */
-    char pstat_path[64];
+    char pstat_path[PATH_MAX];
     snprintf(pstat_path, sizeof(pstat_path), "/proc/%s/stat", de->d_name);
     FILE *pf = fopen(pstat_path, "r");
     if (pf) {
@@ -1777,7 +1781,7 @@ int show_container_usage(struct ds_config *cfg) {
     while ((de = readdir(proc_dir)) != NULL) {
       if (de->d_name[0] < '1' || de->d_name[0] > '9')
         continue;
-      char ns_path[64];
+      char ns_path[PATH_MAX];
       snprintf(ns_path, sizeof(ns_path), "/proc/%s/ns/pid", de->d_name);
       char ns_buf[256] = {0};
       ssize_t r = readlink(ns_path, ns_buf, sizeof(ns_buf) - 1);
@@ -1787,7 +1791,7 @@ int show_container_usage(struct ds_config *cfg) {
       if (strcmp(ns_buf, container_ns) != 0)
         continue;
 
-      char pstat_path[64];
+      char pstat_path[PATH_MAX];
       snprintf(pstat_path, sizeof(pstat_path), "/proc/%s/stat", de->d_name);
       FILE *pf = fopen(pstat_path, "r");
       if (pf) {

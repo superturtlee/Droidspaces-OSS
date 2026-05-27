@@ -771,14 +771,18 @@ static void ds_selinux_transition(char **argv) {
   {
     int sfd = open("/proc/self/attr/current", O_WRONLY);
     if (sfd >= 0) {
-      write(sfd, DS_SELINUX_CTX, strlen(DS_SELINUX_CTX));
+      if (write(sfd, DS_SELINUX_CTX, strlen(DS_SELINUX_CTX)) < 0) {
+        /* ignore */
+      }
       close(sfd);
     }
   }
   /* Clear the stale exec context regardless of whether setcon worked */
   fd = open("/proc/self/attr/exec", O_WRONLY);
   if (fd >= 0) {
-    write(fd, "\0", 1);
+    if (write(fd, "\0", 1) < 0) {
+      /* ignore */
+    }
     close(fd);
   }
 }
@@ -821,7 +825,8 @@ int ds_daemon_run(int foreground, char **argv) {
 
 #ifdef DS_ENABLE_SOCKETD_BACKEND
   if (ds_socketd_bridge_start() < 0)
-    ds_warn("Failed to start droidspaces-socketd backend bridge: %s", strerror(errno));
+    ds_warn("Failed to start droidspaces-socketd backend bridge: %s",
+            strerror(errno));
 #endif
 
   /* Write PID file so the Android app can signal us */

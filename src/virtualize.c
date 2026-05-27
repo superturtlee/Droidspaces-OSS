@@ -42,7 +42,9 @@ static int write_inplace(const char *path, const char *buf, size_t len) {
   if (w == (ssize_t)len) {
     /* Ignore ftruncate failure as we already wrote the data;
      * it might fail if the file is already the correct size. */
-    (void)ftruncate(fd, (off_t)len);
+    if (ftruncate(fd, (off_t)len) < 0) {
+      /* ignore */
+    }
   }
   close(fd);
   return (w == (ssize_t)len) ? 0 : -1;
@@ -564,7 +566,7 @@ int ds_virtualize_init(struct ds_config *cfg) {
        * sysfs base. This preserves all sub-files (cpufreq, topology, etc). */
       int n = container_cpus(cfg);
       for (int i = 0; i < n; i++) {
-        char vcpu[PATH_MAX], realcpu[PATH_MAX];
+        char vcpu[PATH_MAX + 32], realcpu[PATH_MAX];
         snprintf(vcpu, sizeof(vcpu), "%s/cpu%d", sysfs_base, i);
         snprintf(realcpu, sizeof(realcpu), "/sys/devices/system/cpu/cpu%d", i);
         if (access(realcpu, F_OK) == 0) {
@@ -582,7 +584,7 @@ int ds_virtualize_init(struct ds_config *cfg) {
         char *buf = gen_cpu_sysfs(cfg, &len);
         if (!buf)
           continue;
-        char vpath[PATH_MAX];
+        char vpath[PATH_MAX + 32];
         snprintf(vpath, sizeof(vpath), "%s/%s", sysfs_base, sysfs_names[i]);
         write_file(vpath, buf);
         free(buf);
@@ -619,8 +621,9 @@ void ds_virtualize_update(struct ds_config *cfg) {
     }
   }
 
-  /* Pre-check: if the virtualization tmpfs directory is not yet mounted/created,
-   * skip the update silently to avoid startup race logs and redundant generation overhead. */
+  /* Pre-check: if the virtualization tmpfs directory is not yet
+   * mounted/created, skip the update silently to avoid startup race logs and
+   * redundant generation overhead. */
   char vproc_dir[PATH_MAX];
   snprintf(vproc_dir, sizeof(vproc_dir), "/proc/%d/root" VPROC_PATH,
            (int)cfg->container_pid);

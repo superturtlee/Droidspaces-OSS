@@ -513,7 +513,9 @@ int create_devices(const char *rootfs, int hw_access, int privileged_mask) {
     for (int i = 1; i <= DS_MAX_TTYS; i++) {
       snprintf(path, sizeof(path), "%s/dev/tty%d", rootfs, i);
       force_unlink(path);
-      symlink("/dev/null", path);
+      if (symlink("/dev/null", path) < 0) {
+        /* best-effort, ignore */
+      }
     }
   }
   /* Standard symlinks */

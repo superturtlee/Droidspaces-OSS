@@ -407,7 +407,7 @@ int start_rootfs(struct ds_config *cfg) {
    * For rootfs.img mode the image is now mounted; for directory mode the
    * rootfs_path is already set.  Either way we have a valid host path. */
   {
-    char init_path[PATH_MAX];
+    char init_path[PATH_MAX * 2];
     char rootfs_norm[PATH_MAX];
     if (cfg->is_img_mount && cfg->img_mount_point[0])
       safe_strncpy(rootfs_norm, cfg->img_mount_point, sizeof(rootfs_norm));
