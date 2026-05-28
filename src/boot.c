@@ -515,7 +515,7 @@ int internal_boot(struct ds_config *cfg) {
    * Apply security hardening (capabilities and seccomp)
    * This is done at the very end to ensure all setup tasks that might need
    * privileges (like chown/chmod or mknod) are finished. */
-  ds_seccomp_apply_minimal(cfg->hw_access, cfg->privileged_mask);
+  ds_seccomp_apply_minimal(cfg->privileged_mask);
   android_seccomp_setup(is_systemd,
                         cfg->block_nested_ns &&
                             !(cfg->privileged_mask & DS_PRIV_NOSEC),
