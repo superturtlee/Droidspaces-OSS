@@ -39,8 +39,11 @@ int ds_openpty(int *master, int *slave, char *name) {
     unsigned int ptyno;
     if (ioctl(m, TIOCGPTN, &ptyno) < 0)
       goto err;
-    snprintf(name, PATH_MAX, "/dev/pts/%u", ptyno);
-    s = open(name, O_RDWR | O_NOCTTY | O_CLOEXEC);
+    char pts_path[PATH_MAX];
+    snprintf(pts_path, PATH_MAX, "/dev/pts/%u", ptyno);
+    if (name)
+      snprintf(name, PATH_MAX, "%s", pts_path);
+    s = open(pts_path, O_RDWR | O_NOCTTY | O_CLOEXEC);
     if (s < 0)
       goto err;
   }
