@@ -154,9 +154,9 @@ static void cleanup_container_resources(struct ds_config *cfg, pid_t pid,
     sync();
 
   if (is_android() && !skip_unmount) {
+    ds_x11_daemon_stop(cfg);
     if (count_running_containers(NULL, 0) == 0) {
       android_optimizations(0);
-      cleanup_unified_tmpfs();
     }
     /* SELinux: Restore enforcing mode if no other permissive containers are
      * running, but only if at least one permissive container is installed. */
@@ -447,10 +447,17 @@ int start_rootfs(struct ds_config *cfg) {
     cfg->init_type = detect_container_init(rootfs_norm);
   }
 
-  /* 2b. Android Termux Bridge Preparation - only if flag is set */
+  /* 2b. Android: start Termux-X11 server before fork so the socket exists
+   * when setup_x11_and_virgl_sockets() bind-mounts X0 socket later */
   if (is_android() && cfg->termux_x11) {
-    stop_termux_if_running();
-    setup_unified_tmpfs();
+    ds_x11_daemon_start(cfg);
+
+    /* Wait up to 10s for X0 socket */
+    for (int _i = 0; _i < 100; _i++) {
+      if (access("/data/data/com.termux/files/usr/tmp/.X11-unix/X0", F_OK) == 0)
+        break;
+      usleep(100000);
+    }
   }
 
   /* 3. Early pre-flight for volatile mode (before any host changes) */
@@ -1164,6 +1171,16 @@ int start_rootfs(struct ds_config *cfg) {
 
       cfg->reboot_cycle = 1;
       clock_gettime(CLOCK_BOOTTIME, &cfg->start_time);
+
+      /* Mirror restart behavior: ensure X server is up before next boot */
+      if (is_android() && cfg->termux_x11) {
+        ds_x11_daemon_start(cfg);
+        for (int _i = 0; _i < 100; _i++) {
+          if (access(TX11_SOCK_DIR "/X0", F_OK) == 0)
+            break;
+          usleep(100000);
+        }
+      }
       /* Refresh ns_inode: new container has a new PID namespace inode.
        * Without this, ds_virtualize_update's PID-recycling guard rejects
        * all writes after the first reboot cycle (stale inode != new pid ns). */
@@ -1376,6 +1393,12 @@ int stop_rootfs(struct ds_config *cfg, int skip_unmount) {
   }
 
   ds_log("Stopping container '%s' (PID %d)...", cfg->container_name, pid);
+
+  /* Stop X11 server only on real stop, not restart (cleanup_container_resources
+   * handles it with the same skip_unmount guard, avoiding a double-stop) */
+  if (is_android() && !skip_unmount) {
+    ds_x11_daemon_stop(cfg);
+  }
 
   /* Safe Metadata Capture: Read the mount path from the tracking file (.mount)
    * into memory before we start the shutdown wait loop. This ensures we have

@@ -122,12 +122,21 @@
 
 /* X11 Socket Paths (Host-side relative to /.old_root or absolute) */
 #define DS_X11_PATH_DESKTOP "/.old_root/tmp/.X11-unix"
-#define DS_TERMUX_TMP_DIR "/data/data/com.termux/files/usr/tmp"
 #define DS_TERMUX_TMP_OLDROOT "/.old_root/data/data/com.termux/files/usr/tmp"
 #define DS_X11_CONTAINER_DIR "/tmp/.X11-unix"
 
+/* Termux paths (used by x11.c; kept here for single-source-of-truth) */
+#define TX11_DATA_DIR "/data/user/0/com.termux"
+#define TX11_DATA_ALT "/data/data/com.termux"
+#define TX11_PREFIX "/data/data/com.termux/files/usr"
+#define TX11_HOME "/data/data/com.termux/files/home"
+#define TX11_LOADER TX11_PREFIX "/libexec/termux-x11/loader.apk"
+#define TX11_SOCK_DIR TX11_PREFIX "/tmp/.X11-unix"
+#define TX11_PACKAGES "/data/system/packages.list"
+
 /* File Extensions */
 #define DS_EXT_PID ".pid"
+#define DS_EXT_XPID ".xpid"
 #define DS_EXT_MOUNT ".mount"
 #define DS_EXT_LOCK ".lock"
 #define DS_EXT_INIT ".init"
@@ -323,6 +332,7 @@ struct ds_config {
   char volatile_dir[PATH_MAX];    /* temporary overlay dir */
   pid_t container_pid;            /* PID 1 of the container (host view) */
   pid_t intermediate_pid;         /* intermediate fork pid */
+  pid_t x11_pid;                  /* PID of the Termux-X11 server process */
   int is_img_mount;               /* 1 if rootfs was loop-mounted from .img */
   char img_mount_point[PATH_MAX]; /* where the .img was mounted */
   ds_init_type_t init_type;       /* detected container PID 1 init family */
@@ -543,11 +553,15 @@ unsigned long ds_get_pid_ns_inode(pid_t pid);
 int scan_host_gpu_gids(gid_t *gids, int max_gids);
 void mirror_gpu_nodes(const char *dev_path);
 int setup_gpu_groups(void);
-void stop_termux_if_running(void);
-int setup_unified_tmpfs(void);
-void cleanup_unified_tmpfs(void);
-int setup_x11_and_virgl_sockets(struct ds_config *cfg);
 int setup_hardware_access(struct ds_config *cfg);
+
+/* ---------------------------------------------------------------------------
+ * x11.c
+ * ---------------------------------------------------------------------------*/
+
+void ds_x11_daemon_start(struct ds_config *cfg);
+void ds_x11_daemon_stop(struct ds_config *cfg);
+int ds_setup_x11_socket(struct ds_config *cfg);
 
 /* ---------------------------------------------------------------------------
  * network.c
@@ -700,6 +714,7 @@ int sync_pidfile(const char *src_pidfile, const char *name);
 int show_containers(struct ds_config *cfg);
 int scan_containers(void);
 int check_selinux_permissive_needs(void);
+int check_x11_needs(void);
 void write_plain_env_file(const char *src, const char *dst);
 
 /* ---------------------------------------------------------------------------

@@ -641,12 +641,6 @@ static void handle_conn(int conn) {
 
 /* daemonize the process: detach from terminal and protect from OOM killer */
 static void daemonize(int foreground) {
-  /*
-   * Clear environment to avoid inheriting parent shell's variables (like
-   * Termux). This prevents false-positive detections and ensures a clean state
-   * for all Droidspaces tasks.
-   */
-  clearenv();
   if (is_android()) {
     setenv(
         "PATH",
@@ -767,9 +761,17 @@ static void ds_selinux_transition(char **argv) {
   if (nl)
     *nl = '\0';
 
-  /* Already in the right domain - nothing to do */
-  if (strcmp(cur, DS_SELINUX_CTX) == 0)
+  /* Already in the right domain - clear any stale exec context and return */
+  if (strcmp(cur, DS_SELINUX_CTX) == 0) {
+    fd = open("/proc/self/attr/exec", O_WRONLY);
+    if (fd >= 0) {
+      if (write(fd, "\0", 1) < 0) {
+        /* ignore */
+      }
+      close(fd);
+    }
     return;
+  }
 
   /* Set the exec context - the transition fires on the next execv() */
   fd = open("/proc/self/attr/exec", O_WRONLY);

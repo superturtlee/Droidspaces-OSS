@@ -1006,24 +1006,6 @@ int main(int argc, char **argv) {
                  sizeof(ds_log_container_name));
   }
 
-  /* Prevent Termux suicide when --termux-x11 is used inside Termux */
-  if (is_android() && cfg.termux_x11 && is_running_in_termux() &&
-      (strcmp(cmd, "start") == 0 || strcmp(cmd, "restart") == 0)) {
-    printf("\n" C_RED C_BOLD "[ FATAL: Termux X11 Conflict ]" C_RESET "\n\n");
-    ds_error(
-        "Droidspaces cannot enable --termux-x11 when running inside Termux.");
-    ds_log("Why? Setting up Termux X11 requires restarting the Termux app,");
-    ds_log(
-        "which would terminate this terminal session and Droidspaces itself.");
-    printf("\n" C_CYAN
-           "To use X11 support, please start this container from:" C_RESET
-           "\n");
-    printf("  1. The Droidspaces Android App\n");
-    printf("  2. Using an another Terminal (adb shell, Reterminal, etc)\n\n");
-    ret = 1;
-    goto cleanup;
-  }
-
   /* Basic info commands */
   if (strcmp(cmd, "check") == 0) {
     ret = check_requirements_detailed();

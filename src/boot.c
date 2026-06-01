@@ -355,19 +355,11 @@ int internal_boot(struct ds_config *cfg) {
     goto boot_fail;
   }
 
-  /* 13. Setup /tmp */
-  if (!is_android() || !cfg->termux_x11) {
-    /* Desktop Linux (or Android without Termux-X11): mount fresh tmpfs for
-     * isolation */
-    if (domount("tmpfs", "tmp", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777") <
-        0) {
-      ds_warn("Failed to mount tmpfs at /tmp: %s", strerror(errno));
-    }
-  } else {
-    /* Android with Termux-X11: /tmp will be handled by unified bridge after
-     * pivot_root */
-    mkdir_p("tmp", 01777);
-  }
+  /* 13. Setup /tmp: always mount a fresh isolated tmpfs.
+   * The X0 socket lives in /run/.X11-unix so systemd's tmp.mount
+   * cannot interfere with it. */
+  if (domount("tmpfs", "tmp", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777") < 0)
+    ds_warn("Failed to mount tmpfs at /tmp: %s", strerror(errno));
 
   /* 14. Bind-mount console BEFORE pivot_root (host pts still visible). */
   if (mount(cfg->console.name, "dev/console", NULL, MS_BIND, NULL) < 0)
