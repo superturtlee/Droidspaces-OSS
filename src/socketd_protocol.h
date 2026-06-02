@@ -85,6 +85,10 @@ struct DS_SOCKETD_PACKED ds_socketd_list_containers_req {
   uint8_t _pad[3];
 };
 
+struct DS_SOCKETD_PACKED ds_socketd_container_ref_req {
+  char ref[DS_SOCKETD_RECORD_NAME_MAX]; /* container name or UUID prefix */
+};
+
 struct DS_SOCKETD_PACKED ds_socketd_port_record {
   uint16_t host_port_be;
   uint16_t host_port_end_be; /* 0 if not a range */

@@ -255,6 +255,104 @@ static void socketd_free_loaded_config(struct ds_config *cfg) {
   free_config_unknown_lines(cfg);
 }
 
+static int socketd_is_uuid_prefix_ref(const char *ref) {
+  if (!ref || ref[0] == '\0')
+    return 0;
+
+  size_t len = strlen(ref);
+  if (len > DS_UUID_LEN)
+    return 0;
+
+  for (size_t i = 0; i < len; i++) {
+    if (!isxdigit((unsigned char)ref[i]))
+      return 0;
+  }
+
+  return 1;
+}
+
+static int socketd_load_config_by_ref(const char *ref, struct ds_config *cfg) {
+  if (!ref || !cfg)
+    return DS_SOCKETD_STATUS_BAD_REQUEST;
+
+  size_t ref_len = strlen(ref);
+  if (ref_len == 0 || ref_len >= DS_SOCKETD_RECORD_NAME_MAX)
+    return DS_SOCKETD_STATUS_BAD_REQUEST;
+
+  /*
+   * Docker-compatible callers may address containers by name or ID. Prefer an
+   * exact container-name match, then fall back to matching the persisted
+   * Droidspaces UUID by prefix.
+   */
+  if (validate_container_name(ref)) {
+    if (ds_config_load_by_name(ref, cfg) < 0)
+      return DS_SOCKETD_STATUS_INTERNAL_ERROR;
+
+    if (cfg->config_file_existed)
+      return DS_SOCKETD_STATUS_OK;
+
+    socketd_free_loaded_config(cfg);
+    memset(cfg, 0, sizeof(*cfg));
+  }
+
+  if (!socketd_is_uuid_prefix_ref(ref))
+    return DS_SOCKETD_STATUS_BAD_REQUEST;
+
+  char containers_path[PATH_MAX];
+  snprintf(containers_path, sizeof(containers_path), "%s/Containers",
+           get_workspace_dir());
+
+  DIR *containers_dir = opendir(containers_path);
+  if (!containers_dir) {
+    if (errno == ENOENT)
+      return DS_SOCKETD_STATUS_NOT_FOUND;
+    return DS_SOCKETD_STATUS_INTERNAL_ERROR;
+  }
+
+  enum ds_socketd_status status = DS_SOCKETD_STATUS_NOT_FOUND;
+  struct dirent *ent;
+
+  while ((ent = readdir(containers_dir)) != NULL) {
+    if (ent->d_name[0] == '.')
+      continue;
+
+    if (!validate_container_name(ent->d_name))
+      continue;
+
+    struct ds_config candidate;
+    memset(&candidate, 0, sizeof(candidate));
+
+    if (ds_config_load_by_name(ent->d_name, &candidate) < 0) {
+      socketd_free_loaded_config(&candidate);
+      status = DS_SOCKETD_STATUS_INTERNAL_ERROR;
+      break;
+    }
+
+    if (!candidate.config_file_existed || candidate.uuid[0] == '\0' ||
+        strncmp(candidate.uuid, ref, ref_len) != 0) {
+      socketd_free_loaded_config(&candidate);
+      continue;
+    }
+
+    if (status == DS_SOCKETD_STATUS_OK) {
+      socketd_free_loaded_config(&candidate);
+      socketd_free_loaded_config(cfg);
+      memset(cfg, 0, sizeof(*cfg));
+      status = DS_SOCKETD_STATUS_BAD_REQUEST;
+      break;
+    }
+
+    *cfg = candidate;
+    status = DS_SOCKETD_STATUS_OK;
+
+    if (ref_len == DS_UUID_LEN)
+      break;
+  }
+
+  closedir(containers_dir);
+  return status;
+}
+
 static void
 socketd_pack_container_record(struct ds_socketd_container_record *record,
                               const struct ds_config *cfg, pid_t pid) {
@@ -573,7 +671,7 @@ static void socketd_handle_conn(int conn) {
         htonl(DS_SOCKETD_CAP_PROTOCOL_V1 | DS_SOCKETD_CAP_PING |
               DS_SOCKETD_CAP_CAPABILITIES | DS_SOCKETD_CAP_INFO |
               DS_SOCKETD_CAP_LIST_CONTAINERS | DS_SOCKETD_CAP_LIST_IMAGES |
-              DS_SOCKETD_CAP_POLL_EVENTS);
+              DS_SOCKETD_CAP_INSPECT_CONTAINER | DS_SOCKETD_CAP_POLL_EVENTS);
     socketd_send_response(conn, DS_SOCKETD_STATUS_OK, &caps_be,
                           (uint32_t)sizeof(caps_be));
     return;
@@ -928,7 +1026,46 @@ static void socketd_handle_conn(int conn) {
     return;
   }
 
-  case DS_SOCKETD_OP_INSPECT_CONTAINER:
+   case DS_SOCKETD_OP_INSPECT_CONTAINER: {
+    struct ds_socketd_container_ref_req inspect_req;
+    memset(&inspect_req, 0, sizeof(inspect_req));
+
+    if (socketd_read_payload(conn, &inspect_req,
+                             (uint32_t)sizeof(inspect_req),
+                             payload_len) < 0) {
+      socketd_send_response(conn, DS_SOCKETD_STATUS_BAD_REQUEST, NULL, 0);
+      return;
+    }
+
+    if (memchr(inspect_req.ref, '\0', sizeof(inspect_req.ref)) == NULL ||
+        inspect_req.ref[0] == '\0') {
+      socketd_send_response(conn, DS_SOCKETD_STATUS_BAD_REQUEST, NULL, 0);
+      return;
+    }
+
+    struct ds_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+
+    int status = socketd_load_config_by_ref(inspect_req.ref, &cfg);
+    if (status != DS_SOCKETD_STATUS_OK) {
+      socketd_free_loaded_config(&cfg);
+      socketd_send_response(conn, (enum ds_socketd_status)status, NULL, 0);
+      return;
+    }
+
+    pid_t pid = 0;
+    int running = is_container_running(&cfg, &pid) && pid > 0;
+
+    struct ds_socketd_container_record record;
+    socketd_pack_container_record(&record, &cfg, running ? pid : 0);
+
+    socketd_free_loaded_config(&cfg);
+
+    socketd_send_response(conn, DS_SOCKETD_STATUS_OK, &record,
+                          (uint32_t)sizeof(record));
+    return;
+  }
+  
   case DS_SOCKETD_OP_START_CONTAINER:
   case DS_SOCKETD_OP_STOP_CONTAINER:
   case DS_SOCKETD_OP_RESTART_CONTAINER:
