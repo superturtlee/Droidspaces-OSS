@@ -42,6 +42,9 @@ static void virgl_child_wrapper(int ready_fd, void *user_data) {
   /* Make VirGL server unkillable */
   ds_oom_protect();
 
+  /* Enter droidspacesd domain -- best-effort, fallback on pre-reboot */
+  ds_selinux_enter_domain();
+
   fprintf(stdout, "[VirGL] uid=%d starting server\n", (int)getuid());
   fflush(stdout);
 

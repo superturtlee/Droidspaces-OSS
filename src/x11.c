@@ -114,12 +114,10 @@ static void xserver_child_wrapper(int ready_fd, void *user_data) {
     _exit(1);
   }
 
-  /* SELinux dyntransition into untrusted_app */
-  char target[256] = "";
-  ds_selinux_dyntransition(mls, target, sizeof(target));
+  /* SELinux dyntransition into untrusted_app_27 (Termux domain) */
+  ds_selinux_dyntransition(mls);
 
-  fprintf(stdout, "[X11] ctx=%s uid=%d display=%s\n", target, (int)getuid(),
-          args->display);
+  fprintf(stdout, "[X11] uid=%d display=%s\n", (int)getuid(), args->display);
   fflush(stdout);
 
   char nice[256];

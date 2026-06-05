@@ -456,7 +456,6 @@ void firmware_path_remove(const char *fw_path);
 int run_command(char *const argv[]);
 int run_command_quiet(char *const argv[]);
 int run_command_log(char *const argv[]);
-int get_selinux_context(const char *path, char *buf, size_t size);
 int set_selinux_context(const char *path, const char *context);
 int ds_send_fd(int sock, int fd);
 int ds_recv_fd(int sock);
@@ -538,9 +537,10 @@ int android_seccomp_setup(int is_systemd, int block_nested_ns,
 int ds_seccomp_apply_minimal(int privileged_mask);
 
 /* SELinux + Termux privilege helpers */
+int get_selinux_context(const char *path, char *buf, size_t size);
 const char *ds_extract_mls(const char *ctx);
-void ds_selinux_dyntransition(const char *mls, char *applied_ctx,
-                              size_t ctx_size);
+void ds_selinux_dyntransition(const char *mls);
+void ds_selinux_enter_domain(void);
 int ds_drop_privileges(int uid);
 int ds_resolve_termux_uid(void);
 

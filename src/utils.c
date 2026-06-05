@@ -1465,21 +1465,30 @@ int get_selinux_context(const char *path, char *buf, size_t size) {
   if (!path || !buf || size == 0)
     return -1;
 
-  /* Use lgetxattr to read the security.selinux attribute */
   ssize_t len = lgetxattr(path, "security.selinux", buf, size - 1);
-  if (len < 0) {
 #ifdef SYS_lgetxattr
+  if (len < 0)
     len = syscall(SYS_lgetxattr, path, "security.selinux", buf, size - 1);
 #endif
-  }
-
-  /* FIX: Check bounds before writing null terminator */
-  if (len < 0 || len >= (ssize_t)(size - 1)) {
+  if (len < 0 || len >= (ssize_t)(size - 1))
     return -1;
-  }
 
   buf[len] = '\0';
   return 0;
+}
+
+/* Transition self into u:r:droidspacesd:s0.
+ * Best-effort: if the write fails (policy not loaded, permissive host),
+ * the caller inherits whatever domain the root process already holds.
+ * No MLS suffix -- droidspacesd is declared permissive in sepolicy.rule. */
+void ds_selinux_enter_domain(void) {
+  const char *ctx = "u:r:droidspacesd:s0";
+  int fd = open("/proc/self/attr/current", O_WRONLY | O_CLOEXEC);
+  if (fd < 0)
+    return;
+  if (write(fd, ctx, strlen(ctx) + 1) < 0) { /* ignore -- best effort */
+  }
+  close(fd);
 }
 
 int ds_get_selinux_status(void) {

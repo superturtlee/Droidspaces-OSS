@@ -41,6 +41,11 @@ void ds_monitor_run(struct ds_config *cfg, int sync_pipe_write) {
   /* Make monitor unkillable */
   ds_oom_protect();
 
+  /* Enter droidspacesd domain. Best-effort: if policy not yet loaded
+   * (user hasn't rebooted after module install), we stay in the inherited
+   * domain -- still functional since droidspacesd is typepermissive. */
+  ds_selinux_enter_domain();
+
   prctl(PR_SET_NAME, "[ds-monitor]", 0, 0, 0);
 
   /* Unshare namespaces - Monitor enters new UTS, IPC, and optionally Cgroup

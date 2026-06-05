@@ -75,6 +75,10 @@ static void pulse_child_wrapper(int ready_fd, void *user_data) {
   /* Ensure the tmp directory exists (root creates it before priv drop) */
   mkdir_p(TX11_PREFIX "/tmp", 0755);
 
+  /* Stay in droidspacesd (permissive) -- no domain transition needed.
+   * untrusted_app_27 blocks execv of Termux binaries under enforcing. */
+  ds_selinux_enter_domain();
+
   /* Drop root -> Termux UID. */
   if (ds_drop_privileges(args->uid) < 0) {
     perror("[PulseAudio] privilege drop failed");
@@ -131,7 +135,8 @@ static void run_pactl_set_default(int uid) {
       close(devnull);
     }
 
-    /* Run as the same Termux UID with the same supplementary groups */
+    /* Stay in droidspacesd (permissive) */
+    ds_selinux_enter_domain();
     if (ds_drop_privileges(uid) < 0) {
       _exit(1);
     }
