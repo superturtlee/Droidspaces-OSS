@@ -11,130 +11,11 @@
 #define _GNU_SOURCE
 #include "droidspace.h"
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 /* ---- helpers ---------------------------------------------------------- */
-
-#define PA_DEFAULT_PA TX11_PREFIX "/etc/pulse/default.pa"
-#define PA_AAUDIO_LINE "load-module module-aaudio-sink"
-#define PA_ALWAYS_LINE "load-module module-always-sink"
-#define PA_SLES_LINE "load-module module-sles-sink"
-#define PA_CK_LINE "load-module module-console-kit"
-
-/*
- * Patch Termux's default.pa so module-aaudio-sink loads before
- * module-always-sink. Without this ordering, module-always-sink spawns a
- * null-sink fallback (seeing no real sink yet), then tries to async-unload it
- * via D-Bus once AAudio appears -- but there is no system bus on Android, so
- * the deferred unload wedges PulseAudio's mainloop permanently.
- *
- * Idempotent: if already patched, returns immediately.
- */
-static void patch_default_pa(void) {
-  FILE *f = fopen(PA_DEFAULT_PA, "r");
-  if (!f) {
-    ds_warn("[PulseAudio] cannot open %s for patching: %s", PA_DEFAULT_PA,
-            strerror(errno));
-    return;
-  }
-
-  /* Slurp the whole file */
-  fseek(f, 0, SEEK_END);
-  long sz = ftell(f);
-  rewind(f);
-  char *buf = malloc((size_t)sz + 1);
-  if (!buf) {
-    fclose(f);
-    return;
-  }
-  size_t rd = fread(buf, 1, (size_t)sz, f);
-  fclose(f);
-  buf[rd] = '\0';
-
-  /* Check if already patched: aaudio line must appear before always-sink
-   * and console-kit must be commented out. */
-  char *pos_aaudio = strstr(buf, PA_AAUDIO_LINE);
-  char *pos_always = strstr(buf, PA_ALWAYS_LINE);
-  int ck_active = 0;
-  char *p = buf;
-  while ((p = strstr(p, PA_CK_LINE)) != NULL) {
-    /* walk back to start of line to check for leading '#' */
-    char *sol = p;
-    while (sol > buf && *(sol - 1) != '\n')
-      sol--;
-    if (*sol != '#') {
-      ck_active = 1;
-      break;
-    }
-    p++;
-  }
-
-  if (pos_aaudio && pos_always && pos_aaudio < pos_always && !ck_active) {
-    ds_log("[PulseAudio] default.pa already patched, skipping");
-    free(buf);
-    return;
-  }
-
-  ds_log("[PulseAudio] patching %s ...", PA_DEFAULT_PA);
-
-  /* Write to a tmp file then rename atomically */
-  char tmp[PATH_MAX];
-  snprintf(tmp, sizeof(tmp), "%s.ds_tmp", PA_DEFAULT_PA);
-  FILE *out = fopen(tmp, "w");
-  if (!out) {
-    ds_warn("[PulseAudio] cannot write tmp patch file: %s", strerror(errno));
-    free(buf);
-    return;
-  }
-
-  char *line = buf;
-  int injected = 0;
-  while (*line) {
-    char *nl = strchr(line, '\n');
-    size_t len = nl ? (size_t)(nl - line + 1) : strlen(line);
-
-    /* Comment out module-sles-sink (broken on most Android devices) */
-    if (strncmp(line, PA_SLES_LINE, strlen(PA_SLES_LINE)) == 0) {
-      fputc('#', out);
-      ds_log("[PulseAudio] commented out " PA_SLES_LINE);
-    }
-
-    /* Comment out module-console-kit: no D-Bus system bus on Android,
-     * loading it blocks PA's mainloop on a futex waiting for a D-Bus reply
-     * that never comes. */
-    if (strncmp(line, PA_CK_LINE, strlen(PA_CK_LINE)) == 0) {
-      fputc('#', out);
-      ds_log("[PulseAudio] commented out " PA_CK_LINE);
-    }
-
-    /* Inject aaudio load just before always-sink */
-    if (!injected &&
-        strncmp(line, PA_ALWAYS_LINE, strlen(PA_ALWAYS_LINE)) == 0) {
-      fprintf(out, PA_AAUDIO_LINE "\n");
-      injected = 1;
-      ds_log("[PulseAudio] injected " PA_AAUDIO_LINE " before " PA_ALWAYS_LINE);
-    }
-
-    fwrite(line, 1, len, out);
-    line += len;
-  }
-  fclose(out);
-  free(buf);
-
-  if (rename(tmp, PA_DEFAULT_PA) != 0) {
-    ds_warn("[PulseAudio] failed to rename patched file: %s", strerror(errno));
-    unlink(tmp);
-    return;
-  }
-
-  ds_log("[PulseAudio] default.pa patched successfully");
-}
 
 /*
  * Resolve the Termux UID from packages.list.
@@ -210,7 +91,6 @@ static void pulse_child_wrapper(int ready_fd, void *user_data) {
    * - module-native-protocol-unix: UNIX socket at our custom path
    * - --exit-idle-time=-1: never exit on idle (we manage lifecycle ourselves)
    * - --daemonize=no: stay in foreground so our log relay captures all output
-   * module-aaudio-sink is loaded by default.pa (patched at startup).
    */
   char *argv[] = {
       TX11_PULSE_BIN,
@@ -253,9 +133,8 @@ static void run_pactl_set_default(int uid) {
 
     /* Stay in droidspacesd (permissive) */
     ds_selinux_enter_domain();
-    if (ds_drop_privileges(uid) < 0) {
+    if (ds_drop_privileges(uid) < 0)
       _exit(1);
-    }
 
     setenv("PULSE_SERVER", "unix:" TX11_PULSE_SOCKET, 1);
     setenv("HOME", TX11_HOME, 1);
@@ -267,6 +146,38 @@ static void run_pactl_set_default(int uid) {
   }
   /* Parent: reap to avoid zombie. We don't care about exit code. */
   waitpid(p, NULL, 0);
+}
+
+/* ---- stale config nuke ------------------------------------------------ */
+
+#define PA_CONFIG_DIR TX11_HOME "/.config/pulse"
+
+/*
+ * Remove PulseAudio's stale runtime dir before each start.
+ * A leftover cookie/pid from a previous crash causes PA to refuse
+ * to bind its socket and exit silently with status=1.
+ */
+static void nuke_pulse_config(void) {
+  if (access(PA_CONFIG_DIR, F_OK) != 0)
+    return;
+
+  ds_log("[PulseAudio] nuking stale config: %s", PA_CONFIG_DIR);
+
+  pid_t child = fork();
+  if (child < 0)
+    return;
+  if (child == 0) {
+    int devnull = open("/dev/null", O_RDWR);
+    if (devnull >= 0) {
+      dup2(devnull, STDOUT_FILENO);
+      dup2(devnull, STDERR_FILENO);
+      close(devnull);
+    }
+    execl("/system/bin/rm", "rm", "-rf", PA_CONFIG_DIR, NULL);
+    _exit(1);
+  }
+  int st;
+  waitpid(child, &st, 0);
 }
 
 /* ---- spawn ------------------------------------------------------------ */
@@ -301,10 +212,8 @@ int ds_pulse_daemon_start(struct ds_config *cfg) {
 
   /* Clean up stale socket from a previous crashed run */
   unlink(TX11_PULSE_SOCKET);
+  nuke_pulse_config();
 
-  /* Ensure default.pa loads aaudio before always-sink to avoid null-sink wedge
-   */
-  patch_default_pa();
   ds_log("[PulseAudio] launching daemon (uid=%d)", uid);
   pid_t child = spawn_pulse(uid);
   if (child <= 0)
