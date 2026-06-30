@@ -208,6 +208,42 @@ out_restore:
   return ret;
 }
 
+/* Return 1 if interface `ifname` exists inside the netns at `netns_path`, else
+ * 0.  Used to tell a healthy gateway cable (its peer really lives inside the
+ * CURRENT gateway netns) apart from a stale host-side veth whose peer is
+ * stranded in a zombie netns - one kept alive past container stop by a leftover
+ * process (e.g. tailscaled).  On any error it returns 0, i.e. "not present", so
+ * the caller rebuilds the cable: the safe default. */
+static int netns_has_link(const char *netns_path, const char *ifname) {
+  if (!netns_path || !ifname || !ifname[0])
+    return 0;
+
+  int self_fd = open("/proc/self/ns/net", O_RDONLY | O_CLOEXEC);
+  if (self_fd < 0)
+    return 0;
+  int target_fd = open(netns_path, O_RDONLY | O_CLOEXEC);
+  if (target_fd < 0) {
+    close(self_fd);
+    return 0;
+  }
+
+  int present = 0;
+  if (setns(target_fd, CLONE_NEWNET) == 0) {
+    ds_nl_ctx_t *ctx = ds_nl_open();
+    if (ctx) {
+      present = ds_nl_link_exists(ctx, ifname) ? 1 : 0;
+      ds_nl_close(ctx);
+    }
+    if (setns(self_fd, CLONE_NEWNET) < 0)
+      ds_warn("[NET] Gateway: failed to restore netns after liveness check: %s",
+              strerror(errno));
+  }
+
+  close(target_fd);
+  close(self_fd);
+  return present;
+}
+
 /* ---------------------------------------------------------------------------
  * Uplink routing globals - shared by android routing setup and monitor
  * ---------------------------------------------------------------------------*/
@@ -918,10 +954,12 @@ static pid_t gateway_pid_of(const char *name) {
  *   - ensure the gateway-side veth (ds-g<hash>) exists with its peer living in
  *     the gateway netns as gw_if (e.g. eth1)
  *
- * Idempotent: a live ds-g<hash> implies a live peer (veth pairs die together),
- * so a repeat call is a cheap reattach.  When the cable is absent we plug a
- * fresh one into the gateway's (possibly just-rebooted) netns - this is what
- * heals clients after a gateway restart, with no client restart.
+ * Idempotent: a repeat call is a cheap reattach when the cable is genuinely
+ * healthy (its peer lives inside the CURRENT gateway netns).  When the cable is
+ * absent - or present but stale (peer stranded in a zombie netns that outlived
+ * the previous gateway) - we plug a fresh one into the gateway's (possibly
+ * just-rebooted) netns.  This is what heals clients after a gateway restart,
+ * with no client restart.
  *
  * Returns 0 when the gateway-side cable is up, -1 on a netlink failure.
  * ---------------------------------------------------------------------------*/
@@ -972,18 +1010,32 @@ static int gateway_ensure_lan_uplink_locked(struct ds_config *cfg,
   write_file("/proc/sys/net/bridge/bridge-nf-call-iptables", "0");
   write_file("/proc/sys/net/bridge/bridge-nf-call-ip6tables", "0");
 
-  /* Cable already present → live gateway peer → just re-assert master + up.
-   * This is the idempotent no-op path when the segment is already healthy. */
-  if (ds_nl_link_exists(ctx, gw_host)) {
-    if (ds_nl_set_master(ctx, gw_host, bridge) < 0)
-      ds_warn("[NET] Gateway: failed to reattach %s to %s", gw_host, bridge);
-    ds_nl_link_up(ctx, gw_host);
-    ds_nl_close(ctx);
-    return 0;
-  }
-
   char gw_netns[PATH_MAX];
   snprintf(gw_netns, sizeof(gw_netns), "/proc/%d/ns/net", (int)gw_pid);
+
+  /* Host-side cable present.  This does NOT prove the peer is inside the
+   * CURRENT gateway netns: if a process kept the previous gateway's netns alive
+   * past `stop` (e.g. tailscaled), the veth pair survived and its peer is
+   * stranded there - so a stale ds-g<hash> can outlive the gateway it was built
+   * for. Verify gw_if actually exists inside this gateway before trusting the
+   * cable.
+   *   - peer live in this netns → idempotent no-op: re-assert master + up.
+   *   - peer absent           → stale cable: delete it (which also reaps the
+   *                             stranded peer, veth pairs die together) and
+   * fall through to build a fresh one into this netns. */
+  if (ds_nl_link_exists(ctx, gw_host)) {
+    if (netns_has_link(gw_netns, gw_if)) {
+      if (ds_nl_set_master(ctx, gw_host, bridge) < 0)
+        ds_warn("[NET] Gateway: failed to reattach %s to %s", gw_host, bridge);
+      ds_nl_link_up(ctx, gw_host);
+      ds_nl_close(ctx);
+      return 0;
+    }
+    ds_warn("[NET] Gateway: stale cable %s (peer not in gateway netns) - "
+            "rebuilding",
+            gw_host);
+    ds_nl_del_link(ctx, gw_host);
+  }
 
   ds_log("[NET] Gateway: creating gateway veth %s <-> %s", gw_host, gw_peer);
   if (ds_nl_create_veth(ctx, gw_host, gw_peer) < 0) {
