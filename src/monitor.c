@@ -401,6 +401,22 @@ reboot_loop:;
         }
       }
 
+      /* Gateway self-heal: if any running client delegates to THIS container as
+       * its gateway, (re)plug their LAN cable into our (possibly just-rebooted)
+       * netns now.  Runs on every boot cycle - a cheap no-op when nobody routes
+       * through us - so a gateway reboot re-wires its clients with no client
+       * restart.
+       *
+       * This MUST run BEFORE the DONE handshake below.  The DONE write is what
+       * unblocks init to proceed into pivot_root + exec of the real init
+       * (procd/netifd).  A client's own eth0 is likewise wired before its DONE
+       * (setup_gateway_veth_side above); plugging the gateway's LAN cable(s)
+       * (eth1 ...) after DONE would hot-plug them into a gateway whose netifd
+       * is already booting, racing its LAN bring-up.  Wire first, then unblock,
+       * so the gateway execs its init with every client cable already present.
+       */
+      ds_net_rewire_gateway_clients(cfg->container_name, netns_pid);
+
       /* Send handshake to init */
       struct ds_net_handshake hs;
       ds_net_derive_handshake(netns_pid, cfg, &hs);
@@ -413,13 +429,6 @@ reboot_loop:;
       if (write(cfg->net_done_pipe[1], &hs, sizeof(hs)) != (ssize_t)sizeof(hs))
         ds_warn("[NET] Monitor: failed to write handshake to init");
       close(cfg->net_done_pipe[1]);
-
-      /* Gateway self-heal: if any running client delegates to THIS container as
-       * its gateway, (re)plug their LAN cable into our (possibly just-rebooted)
-       * netns now.  Runs on every boot cycle - a cheap no-op when nobody routes
-       * through us - so a gateway reboot re-wires its clients with no client
-       * restart. */
-      ds_net_rewire_gateway_clients(cfg->container_name, netns_pid);
     }
   }
 
