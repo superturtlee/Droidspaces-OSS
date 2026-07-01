@@ -19,6 +19,7 @@
     <string name="hostname_placeholder">留空以使用預設值</string>
     <string name="error_ip_collision">此IP 已指派給“%1$s ”</string>
     <string name="abnormal_legend">異常</string>
+    <string name="enter_manually">或手動輸入（支援通配符）：</string>
     <string name="backend_not_installed">後端: 未安裝</string>
     <string name="unable_to_read_container_info">無法讀取容器資訊</string>
     <string name="use_sparse_image">使用稀疏映像檔</string>
@@ -39,6 +40,7 @@
     <string name="daemon_mode">守護程式模式</string>
     <string name="kernel">核心</string>
     <string name="failed_to_action">失敗%1$s %2$s</string>
+    <string name="add_upstream_interface">新增上游網路介面</string>
     <string name="container_information">容器資訊</string>
     <string name="edit_container_title">編輯容器：%1$s</string>
     <string name="select_user">選擇使用者</string>
@@ -163,6 +165,7 @@
     <string name="root_access_not_available">無法取得Root 權限</string>
     <string name="container_name_exists">已存在同名容器</string>
     <string name="network_mode_none">無（完全隔離）</string>
+    <string name="upstream_interface_title">上游網路介面（可選）</string>
     <string name="disable_service">停用</string>
     <string name="dynamic_color">使用系統預設方案</string>
     <string name="enter_container_path">輸入容器路徑</string>
@@ -179,6 +182,7 @@
     <string name="removing_old_module">正在移除舊模組...</string>
     <string name="force_cgroupv1_description">強制使用舊版Cgroup V1 層級結構</string>
     <string name="android_version">Android 版本</string>
+    <string name="available_system_interfaces">可用的系統介面：</string>
     <string name="failed_to_uninstall_container">卸載容器失敗 %1$s</string>
     <string name="error_invalid_range_format">範圍格式無效（起始-結束）</string>
     <string name="container_port_hint">容器連接埠（1-65535 或範圍）</string>
@@ -257,6 +261,7 @@
     <string name="comma">,</string>
     <string name="no_options_enabled">未啟用任何附加選項</string>
     <string name="no_services_found">未找到服務</string>
+    <string name="interface_name_hint">介面名稱（如：wlan0, v4-rmnet_data*）</string>
     <string name="dns_servers_hint">僅允許數字、點和冒號</string>
     <string name="add">添加</string>
     <string name="module_installation_failed">模組安裝失敗</string>
@@ -273,6 +278,7 @@
     <string name="installation_setup_summary">安裝概要</string>
     <string name="checking_root">正在檢查root存取權限...</string>
     <string name="refresh_users">重新整理用戶</string>
+    <string name="upstream_interface_hint">將網路存取固定到指定介面。留空則自動偵測目前作用中的上游介面。</string>
     <string name="mask_service">屏蔽服務</string>
     <string name="leave_blank_for_symmetric">留空表示對稱映射</string>
     <string name="size_required">必須指定大小</string>
@@ -494,4 +500,7 @@
     <string name="gateway_iface">網關介面</string>
     <string name="gateway_iface_hint">eth1</string>
     <string name="gateway_bridge">主機網橋</string>
+    <string name="disk_usage">磁碟使用情況</string>
+    <string name="disk_usage_used_of_total">%1$s / %2$s 已使用</string>
+    <string name="disk_usage_calculating">正在計算…</string>
 </resources>

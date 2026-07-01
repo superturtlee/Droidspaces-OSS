@@ -169,7 +169,11 @@ static int ds_nl_talk(ds_nl_ctx_t *ctx, struct nlmsghdr *req) {
         continue; /* more fragments coming */
       return 0;
     }
-    break;
+    /* No message matching our sequence was in this datagram.  This happens when
+     * a prior request left a trailing ACK in the socket buffer, or for a
+     * multipart reply that spans datagrams.  recv() again for our actual reply
+     * rather than (wrongly) reporting success - the bug that made
+     * ds_nl_link_exists() return false positives. */
   }
   return 0;
 }
@@ -276,7 +280,11 @@ int ds_nl_link_exists(ds_nl_ctx_t *ctx, const char *ifname) {
   memset(&req, 0, sizeof(req));
   req.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
   req.n.nlmsg_type = RTM_GETLINK;
-  req.n.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+  /* No NLM_F_ACK: a successful GETLINK already replies with RTM_NEWLINK; adding
+   * ACK makes the kernel send a *second* (NLMSG_ERROR err=0) message, whose
+   * leftover in the socket buffer used to desync the next request's reply.
+   * A missing link still returns NLMSG_ERROR(-ENODEV) regardless of ACK. */
+  req.n.nlmsg_flags = NLM_F_REQUEST;
   req.i.ifi_family = AF_UNSPEC;
   nl_addattr(&req.n, (int)sizeof(req), IFLA_IFNAME, ifname,
              (int)strlen(ifname) + 1);
@@ -415,7 +423,8 @@ int ds_nl_set_master(ds_nl_ctx_t *ctx, const char *ifname, const char *master) {
  * Bring link UP / DOWN
  * ---------------------------------------------------------------------------*/
 
-int ds_nl_link_up(ds_nl_ctx_t *ctx, const char *ifname) {
+/* Set or clear IFF_UP on an interface (shared by link_up / link_down). */
+static int ds_nl_link_set_up(ds_nl_ctx_t *ctx, const char *ifname, int up) {
   int idx = ds_nl_get_ifindex(ctx, ifname);
   if (idx <= 0)
     return -ENODEV;
@@ -430,29 +439,17 @@ int ds_nl_link_up(ds_nl_ctx_t *ctx, const char *ifname) {
   req.n.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
   req.i.ifi_family = AF_UNSPEC;
   req.i.ifi_index = idx;
-  req.i.ifi_flags = IFF_UP;
+  req.i.ifi_flags = up ? IFF_UP : 0;
   req.i.ifi_change = IFF_UP;
   return ds_nl_talk(ctx, &req.n);
 }
 
-int ds_nl_link_down(ds_nl_ctx_t *ctx, const char *ifname) {
-  int idx = ds_nl_get_ifindex(ctx, ifname);
-  if (idx <= 0)
-    return -ENODEV;
+int ds_nl_link_up(ds_nl_ctx_t *ctx, const char *ifname) {
+  return ds_nl_link_set_up(ctx, ifname, 1);
+}
 
-  struct {
-    struct nlmsghdr n;
-    struct ifinfomsg i;
-  } req;
-  memset(&req, 0, sizeof(req));
-  req.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
-  req.n.nlmsg_type = RTM_NEWLINK;
-  req.n.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-  req.i.ifi_family = AF_UNSPEC;
-  req.i.ifi_index = idx;
-  req.i.ifi_flags = 0;
-  req.i.ifi_change = IFF_UP;
-  return ds_nl_talk(ctx, &req.n);
+int ds_nl_link_down(ds_nl_ctx_t *ctx, const char *ifname) {
+  return ds_nl_link_set_up(ctx, ifname, 0);
 }
 
 /* ---------------------------------------------------------------------------
@@ -629,6 +626,51 @@ int ds_nl_move_to_netns(ds_nl_ctx_t *ctx, const char *ifname, int netns_fd) {
 
   nl_addattr(&req.n, (int)sizeof(req), IFLA_NET_NS_FD, &netns_fd,
              (int)sizeof(int));
+  return ds_nl_talk(ctx, &req.n);
+}
+
+/* ---------------------------------------------------------------------------
+ * Move an interface into another network namespace AND rename it in the same
+ * RTM_NEWLINK request (IFLA_NET_NS_FD + IFLA_IFNAME).  The kernel applies both
+ * in a single op, so the device appears in the target netns already carrying
+ * its final name - there is no transient "raw name then rename" window for a
+ * daemon (e.g. OpenWrt netifd) in that netns to race against.
+ *
+ * The link is brought DOWN first: renaming a running device returns EBUSY on
+ * some drivers, and a freshly created veth peer is down anyway.  The device
+ * arrives DOWN in the target netns; the caller brings it up there.
+ *
+ * Returns 0 on success.  On failure (e.g. newname already exists in the target
+ * netns) nothing is guaranteed to have moved; callers should fall back to a
+ * plain move + in-netns rename.
+ * ---------------------------------------------------------------------------*/
+int ds_nl_move_to_netns_named(ds_nl_ctx_t *ctx, const char *ifname,
+                              int netns_fd, const char *newname) {
+  if (!newname || !newname[0])
+    return ds_nl_move_to_netns(ctx, ifname, netns_fd);
+
+  ds_nl_link_down(ctx, ifname); /* allow rename during the move */
+
+  int idx = ds_nl_get_ifindex(ctx, ifname);
+  if (idx <= 0)
+    return -ENODEV;
+
+  struct {
+    struct nlmsghdr n;
+    struct ifinfomsg i;
+    char buf[256];
+  } req;
+  memset(&req, 0, sizeof(req));
+  req.n.nlmsg_len = NLMSG_LENGTH(sizeof(struct ifinfomsg));
+  req.n.nlmsg_type = RTM_NEWLINK;
+  req.n.nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
+  req.i.ifi_family = AF_UNSPEC;
+  req.i.ifi_index = idx;
+
+  nl_addattr(&req.n, (int)sizeof(req), IFLA_NET_NS_FD, &netns_fd,
+             (int)sizeof(int));
+  nl_addattr(&req.n, (int)sizeof(req), IFLA_IFNAME, newname,
+             (int)strlen(newname) + 1);
   return ds_nl_talk(ctx, &req.n);
 }
 

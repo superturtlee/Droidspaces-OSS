@@ -305,6 +305,7 @@ struct ds_tty_info {
  * ---------------------------------------------------------------------------*/
 
 #define DS_MAX_PORT_FORWARDS 32
+#define DS_MAX_UPSTREAM_IFACES 32
 
 struct ds_port_forward {
   uint16_t host_port;          /* port on the Android/Linux host  */
@@ -429,6 +430,13 @@ struct ds_config {
    * instead of re-deriving a PID-hash IP.  Plain dotted-decimal, no CIDR. */
   char static_nat_ip[INET_ADDRSTRLEN];
 
+  /* User-pinned upstream interfaces (--upstream wlan0,rmnet*,...).  When set,
+   * NAT WAN is forced through this list (priority order, literals + wildcards)
+   * and automatic uplink detection is disabled entirely.  Empty = auto-detect.
+   */
+  char upstream_ifaces[DS_MAX_UPSTREAM_IFACES][IFNAMSIZ];
+  int upstream_iface_count;
+
   /* Resource limits (0 = unlimited) */
   long long memory_limit; /* bytes */
   long long cpu_quota;    /* us per period */
@@ -445,6 +453,8 @@ struct ds_config {
  * ---------------------------------------------------------------------------*/
 
 void safe_strncpy(char *dst, const char *src, size_t size);
+int ds_parse_iface_csv(const char *val, char ifaces[][IFNAMSIZ], int *count,
+                       int max);
 char *ds_resolve_path_arg(const char *path);
 void ds_resolve_argv_paths(int argc, char **argv);
 long ds_get_container_uptime(pid_t pid);
@@ -681,6 +691,15 @@ void ds_net_derive_handshake(pid_t init_pid, struct ds_config *cfg,
                              struct ds_net_handshake *hs);
 void ds_net_cleanup(struct ds_config *cfg, pid_t container_pid);
 void ds_net_start_route_monitor(void);
+/* Gateway self-heal: when the gateway container (re)boots, re-wire its LAN
+ * cable to every running client that delegates to it, with no client restart.
+ * Called from the gateway container's monitor on each boot cycle. */
+void ds_net_rewire_gateway_clients(const char *gateway_name, pid_t gateway_pid);
+/* Gateway teardown: when a container that ACTS AS A GATEWAY stops, explicitly
+ * delete the gateway-side veth(s) it serves and reap any now-idle delegated
+ * bridge.  The kernel does not auto-reap these (the host-side veth pins its
+ * orphan peer netns), so this prevents the leak.  No-op for a non-gateway. */
+void ds_net_gateway_teardown(const char *gateway_name);
 int ds_net_disable_tx_checksum(const char *ifname);
 void parse_cidr(const char *cidr, uint32_t *ip_out, uint32_t *mask_out);
 
@@ -708,6 +727,8 @@ int ds_nl_add_addr4(ds_nl_ctx_t *ctx, const char *ifname, uint32_t ip_be,
 int ds_nl_add_route4(ds_nl_ctx_t *ctx, uint32_t dst_be, uint8_t dst_len,
                      uint32_t gw_be, int oif_idx);
 int ds_nl_move_to_netns(ds_nl_ctx_t *ctx, const char *ifname, int netns_fd);
+int ds_nl_move_to_netns_named(ds_nl_ctx_t *ctx, const char *ifname,
+                              int netns_fd, const char *newname);
 int ds_nl_get_iface_table(ds_nl_ctx_t *ctx, const char *ifname, int *table_out);
 int ds_nl_get_table_default_oif(ds_nl_ctx_t *ctx, int table, char *ifname_out);
 int ds_nl_get_android_default(ds_nl_ctx_t *ctx, char *ifname_out,

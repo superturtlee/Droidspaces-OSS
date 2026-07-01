@@ -96,6 +96,9 @@ class ContainerInstallationViewModel : ViewModel() {
     var sparseImageSizeGB: Int by mutableStateOf(8)
         private set
 
+    var upstreamInterfaces: List<String> by mutableStateOf(emptyList())
+        private set
+
     var portForwards: List<PortForward> by mutableStateOf(emptyList())
         private set
 
@@ -141,6 +144,7 @@ class ContainerInstallationViewModel : ViewModel() {
         customInit: String,
         staticNatIp: String,
         envFileContent: String?,
+        upstreamInterfaces: List<String>,
         portForwards: List<PortForward>,
         forceCgroupv1: Boolean,
         blockNestedNs: Boolean,
@@ -168,6 +172,7 @@ class ContainerInstallationViewModel : ViewModel() {
         this.customInit = customInit
         this.staticNatIp = staticNatIp
         this.envFileContent = envFileContent
+        this.upstreamInterfaces = upstreamInterfaces
         this.portForwards = portForwards
         this.forceCgroupv1 = forceCgroupv1
         this.blockNestedNs = blockNestedNs
@@ -215,6 +220,7 @@ class ContainerInstallationViewModel : ViewModel() {
             status = ContainerStatus.STOPPED, // Default status for new container
             useSparseImage = useSparseImage,
             sparseImageSizeGB = if (useSparseImage) sparseImageSizeGB else null,
+            upstreamInterfaces = upstreamInterfaces,
             portForwards = portForwards,
             forceCgroupv1 = forceCgroupv1,
             blockNestedNs = blockNestedNs,
@@ -250,6 +256,7 @@ class ContainerInstallationViewModel : ViewModel() {
         envFileContent = null
         useSparseImage = true
         sparseImageSizeGB = 8
+        upstreamInterfaces = emptyList()
         portForwards = emptyList()
         forceCgroupv1 = false
         blockNestedNs = false

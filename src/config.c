@@ -393,9 +393,15 @@ int ds_config_load(const char *config_path, struct ds_config *cfg) {
       else
         ds_warn("config: ignoring too-long gateway_lan_ifname '%s'", val);
     } else if (strcmp(key, "upstream_interfaces") == 0) {
-      /* Legacy key from pre-auto-detection builds - the active uplink is
-       * now detected automatically.  Silently swallow it so it is neither
-       * applied nor re-saved as an unknown line. */
+      /* Comma-separated interface names/wildcards, e.g. "wlan0,rmnet*".  When
+       * present this pins NAT WAN to these interfaces in priority order and
+       * disables automatic uplink detection. */
+      if (ds_parse_iface_csv(val, cfg->upstream_ifaces,
+                             &cfg->upstream_iface_count,
+                             DS_MAX_UPSTREAM_IFACES) > 0)
+        ds_warn("config: too many upstream_interfaces (max %d) - extra entries "
+                "ignored",
+                DS_MAX_UPSTREAM_IFACES);
     } else if (strcmp(key, "port_forwards") == 0) {
       /* Comma-separated HOST:CONTAINER[/proto], supporting both single ports
        * and ranges.  Accepted formats:
@@ -698,6 +704,14 @@ static void ds_config_serialize_known(FILE *f, struct ds_config *cfg) {
       fprintf(f, "gateway_bridge=%s\n", cfg->gateway_bridge);
     if (cfg->gateway_lan_ifname[0])
       fprintf(f, "gateway_lan_ifname=%s\n", cfg->gateway_lan_ifname);
+  }
+
+  if (cfg->net_mode == DS_NET_NAT && cfg->upstream_iface_count > 0) {
+    fprintf(f, "upstream_interfaces=");
+    for (int i = 0; i < cfg->upstream_iface_count; i++)
+      fprintf(f, "%s%s", cfg->upstream_ifaces[i],
+              (i < cfg->upstream_iface_count - 1) ? "," : "");
+    fprintf(f, "\n");
   }
 
   if (cfg->net_mode == DS_NET_NAT && cfg->port_forward_count > 0) {

@@ -29,13 +29,15 @@ Linux namespaces are a kernel feature that partitions system resources so that e
 
 ### Network Namespace Isolation (`--net`)
 
-Droidspaces supports three networking modes that determine whether a network namespace (`CLONE_NEWNET`) is used:
+Droidspaces supports four networking modes that determine whether a network namespace (`CLONE_NEWNET`) is used:
 
 1. **Host Mode (`--net=host`) - Default**: Droidspaces deliberately does **not** unshare the network namespace. The container shares the host's network stack. This greatly simplifies setup: containers get internet access immediately without virtual bridges, NAT, or firewall rules. On Android, where networking is already complex (cellular, Wi-Fi, VPN), this avoids a whole category of connectivity issues.
 
-2. **NAT Mode (`--net=nat`)**: The container is placed in a private network namespace. It is connected to the host via a virtual bridge or veth pair, providing **Pure Network Isolation** while maintaining internet access through the host's active internet uplink, which is detected automatically. Compatible with the vast majority of Android devices.
+2. **NAT Mode (`--net=nat`)**: The container is placed in a private network namespace. It is connected to the host via a virtual bridge or veth pair, providing **Pure Network Isolation** while maintaining internet access through the host's active internet uplink, which is detected automatically (or pinned manually with `--upstream`, see below). Compatible with the vast majority of Android devices.
 
 3. **None Mode (`--net=none`)**: The container is placed in a private, air-gapped network namespace with only the loopback interface enabled for maximum security.
+
+4. **Gateway Mode (`--net=gateway`)**: The container's LAN is delegated to *another* running container (typically OpenWRT). Droidspaces does only the L2 plumbing (bridge + veth pairs) and lets the gateway container own all policy - DHCP, DNS, firewall, routing, VPN. Ideal for VPN killswitches, segmented LANs, and traffic analysis. See the dedicated [Networking From Zero](Networking-From-Zero.md) guide for the full deep dive.
 
 ### How It Compares to Chroot
 
@@ -249,9 +251,9 @@ Droidspaces validates bind mount targets with two protections:
 
 ---
 
-## Network Isolation (3 Modes)
+## Network Isolation (4 Modes)
 
-Droidspaces provides three distinct networking modes to balance ease-of-use with advanced isolation.
+Droidspaces provides four distinct networking modes to balance ease-of-use with advanced isolation.
 
 ### 1. Host Mode (`--net=host`) - Default
 The container shares the host's network namespace.
@@ -271,6 +273,14 @@ The container is placed in a private network namespace (`CLONE_NEWNET`) and conn
 ### 3. None Mode (`--net=none`)
 The container gets a private network namespace with only the loopback (`lo`) interface enabled.
 - **Use Case**: Maximum security for offline tasks.
+
+### 4. Gateway Mode (`--net=gateway`)
+The container is placed on an isolated L2 bridge whose **policy is owned by another running container** (typically OpenWRT) instead of by Droidspaces. Droidspaces does only the plumbing - it creates the bridge and the veth pairs and moves them into place; the gateway container provides DHCP, DNS, firewall, routing and VPN.
+- **Required flag**: `--gateway=NAME` names the running container that acts as the router.
+- **Segments**: `--gateway-net=NAME` (default `lan`) selects which bridge/segment the client lands on. Multiple clients sharing a `--gateway-net` share a LAN; different `--gateway-net` values are isolated segments through the same gateway.
+- **Interface naming**: `--gateway-iface=IFACE` (default `eth1`) controls what the LAN interface is called *inside* the gateway container, so it matches the gateway's own config.
+- **Self-healing**: wiring is driven entirely from the host side, so clients are (re)wired automatically when the gateway container starts or reboots - no client restart needed.
+- **Use Cases**: VPN killswitch for selected containers, VLAN-style segmented LANs, single-chokepoint traffic analysis, gateway-wide DNS filtering. See [Networking From Zero](Networking-From-Zero.md) for the complete walkthrough.
 
 ### Port Forwarding (NAT Mode)
 
@@ -294,7 +304,26 @@ Forwarded ports are reachable from any network the host belongs to - including c
 
 
 ### Real-Time Uplink Monitoring
-On Android, the connection often hops between Wi-Fi and Mobile Data. Droidspaces includes a **Route Monitor** that subscribes to kernel routing events (FIB rules, routes, links, addresses). The moment Android switches its default network (e.g., you walk out of Wi-Fi range), the monitor updates the kernel's policy routing to keep the container connected - no configuration, no restart.
+On Android, the connection often hops between Wi-Fi and Mobile Data. Droidspaces includes a **Route Monitor** that subscribes to kernel routing events (FIB rules, routes, links, addresses). The moment Android switches its default network (e.g., you walk out of Wi-Fi range), the monitor updates the kernel's policy routing to keep the container connected - no configuration, no restart. The same monitor works on desktop Linux (e.g. a Wi-Fi to ethernet handoff), where it follows the main routing table's default route.
+
+### Manual Uplink Pinning (`--upstream`)
+By default the uplink is fully automatic. When you want the container's WAN to **ignore the host's active network** and go out through a specific interface instead, pin it with `--upstream`. This switches auto-detection off entirely - the listed interface(s) become the *only* WAN candidates.
+
+```bash
+# Single interface
+--upstream=wlan0
+
+# Priority-ordered list with wildcards (comma-separated)
+--upstream=wlan0,rmnet*
+```
+
+- **Authoritative, not a fallback**: traffic never hops to whatever `netd` marks active - only to interfaces you listed.
+- **Priority failover *within* the list**: the Route Monitor re-resolves on every link/route change and uses the first listed interface that is up and has internet. `wlan0,rmnet*` prefers Wi-Fi and falls back to mobile data, then back to Wi-Fi when it returns.
+- **Literals and wildcards** (`*`, `?`): use `rmnet*` for mobile data, whose interface number is not stable across reconnects.
+- **Disappear/reappear** mid-session is handled: no WAN until a pinned interface is up, then it wires automatically.
+- **Use cases**: pin `tun0` to route the container exclusively through a phone-side VPN (a free killswitch), or pin `rmnet*` (with "Mobile data always active") to keep the container on cellular while the phone stays on Wi-Fi.
+
+> `--upstream` is only valid with `--net=nat`; it is ignored (with a warning) in other modes.
 
 ---
 

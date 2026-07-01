@@ -555,21 +555,24 @@ void ds_dhcp_server_start(struct ds_config *cfg, const char *veth_host,
   g_dhcp.offer_ip_be = offer_ip_be;
   g_dhcp.gw_ip_be = gw_ip_be;
 
-  /* Fetch Bridge MAC */
-  /* We need the bridge MAC to spoof the source in DHCP replies.
-   * If we use 00:00:00... or a random MAC, the container's ARP will break. */
+  /* Source MAC for DHCP replies = the MAC of the interface we transmit on
+   * (veth_host, the bind interface).  That device egresses the reply frame,
+   * and in bridgeless mode it also owns the gateway IP, so the container's ARP
+   * for the gateway resolves to a real MAC.  Looking up the bind interface
+   * works in both bridged and bridgeless modes - no hardcoded bridge
+   * dependency.  Falling back to all-zeros would break the container's ARP. */
   int s = socket(AF_INET, SOCK_DGRAM, 0);
   if (s >= 0) {
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(ifr));
-    safe_strncpy(ifr.ifr_name, DS_NAT_BRIDGE, IFNAMSIZ);
+    safe_strncpy(ifr.ifr_name, veth_host, IFNAMSIZ);
     if (ioctl(s, SIOCGIFHWADDR, &ifr) == 0) {
       memcpy(g_dhcp.server_mac, ifr.ifr_hwaddr.sa_data, 6);
     } else {
       /* Fallback to all-zeros if SIOCGIFHWADDR fails (unlikely) */
       memset(g_dhcp.server_mac, 0, 6);
       ds_warn("[DHCP] Failed to get MAC for %s: %s. Using all-zeros.",
-              DS_NAT_BRIDGE, strerror(errno));
+              veth_host, strerror(errno));
     }
     close(s);
   } else {

@@ -178,6 +178,17 @@ static int target_is_accept(const struct xt_entry_target *t) {
   return 0;
 }
 
+/* Human-readable target name for logging.  Standard targets (ACCEPT and the
+ * other built-in verdicts) carry an empty user.name - the verdict is encoded
+ * numerically - so decode the common ACCEPT case instead of printing ''. */
+static const char *target_label(const struct xt_entry_target *t) {
+  if (t->u.user.name[0])
+    return t->u.user.name;
+  if (target_is_accept(t))
+    return "ACCEPT";
+  return "standard";
+}
+
 /* ---------------------------------------------------------------------------
  * Internal: walk the blob to find an existing rule matching our fingerprint.
  *
@@ -543,7 +554,8 @@ static int remove_matching_rules(int fd, const char *table_name,
           ei++;
           continue;
         }
-        ds_log("[IPT] remove: dropping '%s' rule at offset %u", tname, offset);
+        ds_log("[IPT] remove: dropping '%s' rule at offset %u", target_label(t),
+               offset);
         cumulative_gone += e->next_offset;
         removed_count++;
       } else {
@@ -804,6 +816,85 @@ binary_fallback_masq:
 }
 
 /* ---------------------------------------------------------------------------
+ * Internal: insert_iface_accept
+ *
+ * Insert "-I <chain> 1 [-i|-o] <iface> -j ACCEPT" into the filter table,
+ * idempotently, via the raw socket API with a per-rule binary fallback.
+ * is_out selects the egress (outiface) match; otherwise it matches ingress
+ * (iniface).  Returns 0 when the rule is present (inserted, already there, or
+ * added via the binary fallback), or a negative errno when the table itself
+ * could not be read (the caller decides whether that warrants a full binary
+ * fallback).
+ * ---------------------------------------------------------------------------*/
+
+static int insert_iface_accept(int fd, unsigned int hook, const char *chain,
+                               const char *iface, int is_out) {
+  struct ipt_getinfo info;
+  unsigned char *base = NULL;
+  int ret = get_table(fd, "filter", &info, &base);
+  if (ret < 0)
+    return ret;
+
+  const char *want_in = is_out ? NULL : iface;
+  const char *want_out = is_out ? iface : NULL;
+
+  if (rule_exists_in_hook(&info, ENTRIES_BLOB(base), hook, want_in, want_out, 0,
+                          0, "ACCEPT")) {
+    ds_log("[IPT] %s -%c %s ACCEPT already present", chain, is_out ? 'o' : 'i',
+           iface);
+    free(base);
+    return 0;
+  }
+
+  unsigned char rule_buf[XT_ALIGN(sizeof(struct ipt_entry)) +
+                         XT_ALIGN(sizeof(struct xt_standard_target))];
+  memset(rule_buf, 0, sizeof(rule_buf));
+
+  struct ipt_entry *re = (struct ipt_entry *)rule_buf;
+  struct xt_standard_target *st =
+      (struct xt_standard_target *)(rule_buf +
+                                    XT_ALIGN(sizeof(struct ipt_entry)));
+
+  if (is_out) {
+    safe_strncpy(re->ip.outiface, iface, IFNAMSIZ);
+    memset(re->ip.outiface_mask, 0xff, strlen(iface) + 1);
+  } else {
+    safe_strncpy(re->ip.iniface, iface, IFNAMSIZ);
+    memset(re->ip.iniface_mask, 0xff, strlen(iface) + 1);
+  }
+  re->target_offset = (__u16)XT_ALIGN(sizeof(struct ipt_entry));
+  re->next_offset = (__u16)sizeof(rule_buf);
+
+  st->target.u.target_size = (__u16)XT_ALIGN(sizeof(struct xt_standard_target));
+  st->target.u.user.name[0] = '\0';
+  st->target.u.user.revision = 0;
+  st->verdict = -NF_ACCEPT - 1;
+
+  ret = insert_rule_at_hook(fd, "filter", &info, ENTRIES_BLOB(base), hook,
+                            rule_buf, sizeof(rule_buf));
+  free(base);
+
+  if (ret == 0) {
+    ds_log("[IPT] %s -%c %s ACCEPT inserted", chain, is_out ? 'o' : 'i', iface);
+    return 0;
+  }
+
+  ds_log("[IPT] Raw insert %s -%c %s failed (ret=%d), using binary", chain,
+         is_out ? 'o' : 'i', iface, ret);
+  char *a[] = {"iptables",
+               "-I",
+               (char *)(uintptr_t)chain,
+               "1",
+               is_out ? "-o" : "-i",
+               (char *)(uintptr_t)iface,
+               "-j",
+               "ACCEPT",
+               NULL};
+  run_command_quiet(a);
+  return 0;
+}
+
+/* ---------------------------------------------------------------------------
  * Public API: ds_ipt_ensure_forward_accept
  *
  * Inserts:
@@ -820,118 +911,24 @@ int ds_ipt_ensure_forward_accept(const char *iface) {
   if (!should_use_raw_api())
     goto binary_fallback_fwd;
 
-  int fd = open_raw_socket();
-  if (fd < 0)
-    goto binary_fallback_fwd;
-
-  /* -i iface */
   {
-    struct ipt_getinfo info;
-    unsigned char *base = NULL;
-    int ret = get_table(fd, "filter", &info, &base);
+    int fd = open_raw_socket();
+    if (fd < 0)
+      goto binary_fallback_fwd;
+
+    int ret = insert_iface_accept(fd, NF_INET_FORWARD, "FORWARD", iface, 0);
+    if (ret == 0)
+      ret = insert_iface_accept(fd, NF_INET_FORWARD, "FORWARD", iface, 1);
+    close(fd);
+
     if (ret < 0) {
-      close(fd);
       if (ret == -ENOENT || ret == -ENOPROTOOPT || ret == -EACCES ||
           ret == -EOPNOTSUPP)
         goto binary_fallback_fwd;
       return ret;
     }
-
-    if (!rule_exists_in_hook(&info, ENTRIES_BLOB(base), NF_INET_FORWARD, iface,
-                             NULL, 0, 0, "ACCEPT")) {
-      unsigned char rule_buf[XT_ALIGN(sizeof(struct ipt_entry)) +
-                             XT_ALIGN(sizeof(struct xt_standard_target))];
-      memset(rule_buf, 0, sizeof(rule_buf));
-
-      struct ipt_entry *re = (struct ipt_entry *)rule_buf;
-      struct xt_standard_target *st =
-          (struct xt_standard_target *)(rule_buf +
-                                        XT_ALIGN(sizeof(struct ipt_entry)));
-
-      safe_strncpy(re->ip.iniface, iface, IFNAMSIZ);
-      memset(re->ip.iniface_mask, 0xff, strlen(iface) + 1);
-      re->target_offset = (__u16)XT_ALIGN(sizeof(struct ipt_entry));
-      re->next_offset = (__u16)sizeof(rule_buf);
-
-      st->target.u.target_size =
-          (__u16)XT_ALIGN(sizeof(struct xt_standard_target));
-      st->target.u.user.name[0] = '\0';
-      st->target.u.user.revision = 0;
-      st->verdict = -NF_ACCEPT - 1;
-
-      ret = insert_rule_at_hook(fd, "filter", &info, ENTRIES_BLOB(base),
-                                NF_INET_FORWARD, rule_buf, sizeof(rule_buf));
-      if (ret == 0) {
-        ds_log("[IPT] FORWARD -i %s ACCEPT inserted", iface);
-      } else {
-        ds_log("[IPT] Raw insert -i %s failed (ret=%d), using binary", iface,
-               ret);
-        char *a[] = {"iptables", "-I",     "FORWARD",
-                     "1",        "-i",     (char *)(uintptr_t)iface,
-                     "-j",       "ACCEPT", NULL};
-        run_command_quiet(a);
-      }
-    } else {
-      ds_log("[IPT] FORWARD -i %s ACCEPT already present", iface);
-    }
-    free(base);
+    return 0;
   }
-
-  /* Re-read table for the second insert */
-  {
-    struct ipt_getinfo info;
-    unsigned char *base = NULL;
-    int ret = get_table(fd, "filter", &info, &base);
-    if (ret < 0) {
-      close(fd);
-      if (ret == -ENOENT || ret == -ENOPROTOOPT || ret == -EACCES ||
-          ret == -EOPNOTSUPP)
-        goto binary_fallback_fwd;
-      return ret;
-    }
-
-    if (!rule_exists_in_hook(&info, ENTRIES_BLOB(base), NF_INET_FORWARD, NULL,
-                             iface, 0, 0, "ACCEPT")) {
-      unsigned char rule_buf[XT_ALIGN(sizeof(struct ipt_entry)) +
-                             XT_ALIGN(sizeof(struct xt_standard_target))];
-      memset(rule_buf, 0, sizeof(rule_buf));
-
-      struct ipt_entry *re = (struct ipt_entry *)rule_buf;
-      struct xt_standard_target *st =
-          (struct xt_standard_target *)(rule_buf +
-                                        XT_ALIGN(sizeof(struct ipt_entry)));
-
-      safe_strncpy(re->ip.outiface, iface, IFNAMSIZ);
-      memset(re->ip.outiface_mask, 0xff, strlen(iface) + 1);
-      re->target_offset = (__u16)XT_ALIGN(sizeof(struct ipt_entry));
-      re->next_offset = (__u16)sizeof(rule_buf);
-
-      st->target.u.target_size =
-          (__u16)XT_ALIGN(sizeof(struct xt_standard_target));
-      st->target.u.user.name[0] = '\0';
-      st->target.u.user.revision = 0;
-      st->verdict = -NF_ACCEPT - 1;
-
-      ret = insert_rule_at_hook(fd, "filter", &info, ENTRIES_BLOB(base),
-                                NF_INET_FORWARD, rule_buf, sizeof(rule_buf));
-      if (ret == 0) {
-        ds_log("[IPT] FORWARD -o %s ACCEPT inserted", iface);
-      } else {
-        ds_log("[IPT] Raw insert -o %s failed (ret=%d), using binary", iface,
-               ret);
-        char *a[] = {"iptables", "-I",     "FORWARD",
-                     "1",        "-o",     (char *)(uintptr_t)iface,
-                     "-j",       "ACCEPT", NULL};
-        run_command_quiet(a);
-      }
-    } else {
-      ds_log("[IPT] FORWARD -o %s ACCEPT already present", iface);
-    }
-    free(base);
-  }
-
-  close(fd);
-  return 0;
 
 binary_fallback_fwd:
   ds_log("[IPT] FORWARD ACCEPT binary fallback for iface=%s", iface);
@@ -961,61 +958,22 @@ int ds_ipt_ensure_input_accept(const char *iface) {
   if (!should_use_raw_api())
     goto binary_fallback_inp;
 
-  int fd = open_raw_socket();
-  if (fd < 0)
-    goto binary_fallback_inp;
-
-  struct ipt_getinfo info;
-  unsigned char *base = NULL;
-  int ret = get_table(fd, "filter", &info, &base);
-  if (ret < 0) {
-    close(fd);
-    if (ret == -ENOENT || ret == -ENOPROTOOPT || ret == -EACCES ||
-        ret == -EOPNOTSUPP)
+  {
+    int fd = open_raw_socket();
+    if (fd < 0)
       goto binary_fallback_inp;
-    return ret;
-  }
 
-  if (!rule_exists_in_hook(&info, ENTRIES_BLOB(base), NF_INET_LOCAL_IN, iface,
-                           NULL, 0, 0, "ACCEPT")) {
-    unsigned char rule_buf[XT_ALIGN(sizeof(struct ipt_entry)) +
-                           XT_ALIGN(sizeof(struct xt_standard_target))];
-    memset(rule_buf, 0, sizeof(rule_buf));
+    int ret = insert_iface_accept(fd, NF_INET_LOCAL_IN, "INPUT", iface, 0);
+    close(fd);
 
-    struct ipt_entry *re = (struct ipt_entry *)rule_buf;
-    struct xt_standard_target *st =
-        (struct xt_standard_target *)(rule_buf +
-                                      XT_ALIGN(sizeof(struct ipt_entry)));
-
-    safe_strncpy(re->ip.iniface, iface, IFNAMSIZ);
-    memset(re->ip.iniface_mask, 0xff, strlen(iface) + 1);
-    re->target_offset = (__u16)XT_ALIGN(sizeof(struct ipt_entry));
-    re->next_offset = (__u16)sizeof(rule_buf);
-
-    st->target.u.target_size =
-        (__u16)XT_ALIGN(sizeof(struct xt_standard_target));
-    st->target.u.user.name[0] = '\0';
-    st->target.u.user.revision = 0;
-    st->verdict = -NF_ACCEPT - 1;
-
-    ret = insert_rule_at_hook(fd, "filter", &info, ENTRIES_BLOB(base),
-                              NF_INET_LOCAL_IN, rule_buf, sizeof(rule_buf));
-    if (ret == 0) {
-      ds_log("[IPT] INPUT -i %s ACCEPT inserted", iface);
-    } else {
-      ds_log("[IPT] Raw insert INPUT failed (ret=%d), binary fallback", ret);
-      char *a[] = {"iptables", "-I",     "INPUT",
-                   "1",        "-i",     (char *)(uintptr_t)iface,
-                   "-j",       "ACCEPT", NULL};
-      run_command_quiet(a);
+    if (ret < 0) {
+      if (ret == -ENOENT || ret == -ENOPROTOOPT || ret == -EACCES ||
+          ret == -EOPNOTSUPP)
+        goto binary_fallback_inp;
+      return ret;
     }
-  } else {
-    ds_log("[IPT] INPUT -i %s ACCEPT already present", iface);
+    return 0;
   }
-
-  free(base);
-  close(fd);
-  return 0;
 
 binary_fallback_inp: {
   char *a[] = {"iptables", "-I",     "INPUT",
@@ -1328,6 +1286,25 @@ static int pf_state_remove(const char *container_ip) {
   return 1;
 }
 
+/* Format the three iptables strings for one port-forward entry.  Range entries
+ * (host_port_end set) use START:END for --dport and START-END for
+ * --to-destination; single ports use the plain number. */
+static void pf_fmt_ports(const struct ds_port_forward *pf,
+                         const char *container_ip, char host_port_str[16],
+                         char cont_port_str[16], char to_dest[80]) {
+  if (pf->host_port_end) {
+    snprintf(host_port_str, 16, "%u:%u", pf->host_port, pf->host_port_end);
+    snprintf(cont_port_str, 16, "%u:%u", pf->container_port,
+             pf->container_port_end);
+    snprintf(to_dest, 80, "%s:%u-%u", container_ip, pf->container_port,
+             pf->container_port_end);
+  } else {
+    snprintf(host_port_str, 16, "%u", pf->host_port);
+    snprintf(cont_port_str, 16, "%u", pf->container_port);
+    snprintf(to_dest, 80, "%s:%u", container_ip, pf->container_port);
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Public API: ds_ipt_add_portforwards
  *
@@ -1366,20 +1343,7 @@ int ds_ipt_add_portforwards(struct ds_config *cfg, const char *container_ip) {
     struct ds_port_forward *pf = &cfg->port_forwards[i];
 
     char host_port_str[16], cont_port_str[16], to_dest[80];
-    if (pf->host_port_end) {
-      /* Range syntax: START:END for --dport, START-END for --to-destination */
-      snprintf(host_port_str, sizeof(host_port_str), "%u:%u", pf->host_port,
-               pf->host_port_end);
-      snprintf(cont_port_str, sizeof(cont_port_str), "%u:%u",
-               pf->container_port, pf->container_port_end);
-      snprintf(to_dest, sizeof(to_dest), "%s:%u-%u", container_ip,
-               pf->container_port, pf->container_port_end);
-    } else {
-      snprintf(host_port_str, sizeof(host_port_str), "%u", pf->host_port);
-      snprintf(cont_port_str, sizeof(cont_port_str), "%u", pf->container_port);
-      snprintf(to_dest, sizeof(to_dest), "%s:%u", container_ip,
-               pf->container_port);
-    }
+    pf_fmt_ports(pf, container_ip, host_port_str, cont_port_str, to_dest);
 
     ds_log("portforward: %s %s -> %s", pf->proto, host_port_str, to_dest);
 
@@ -1511,19 +1475,7 @@ int ds_ipt_remove_portforwards(struct ds_config *cfg) {
     struct ds_port_forward *pf = &cfg->port_forwards[i];
 
     char host_port_str[16], cont_port_str[16], to_dest[80];
-    if (pf->host_port_end) {
-      snprintf(host_port_str, sizeof(host_port_str), "%u:%u", pf->host_port,
-               pf->host_port_end);
-      snprintf(cont_port_str, sizeof(cont_port_str), "%u:%u",
-               pf->container_port, pf->container_port_end);
-      snprintf(to_dest, sizeof(to_dest), "%s:%u-%u", container_ip,
-               pf->container_port, pf->container_port_end);
-    } else {
-      snprintf(host_port_str, sizeof(host_port_str), "%u", pf->host_port);
-      snprintf(cont_port_str, sizeof(cont_port_str), "%u", pf->container_port);
-      snprintf(to_dest, sizeof(to_dest), "%s:%u", container_ip,
-               pf->container_port);
-    }
+    pf_fmt_ports(pf, container_ip, host_port_str, cont_port_str, to_dest);
 
     /* addrtype variant */
     char *del_at[] = {

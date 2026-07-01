@@ -30,6 +30,37 @@ void safe_strncpy(char *dst, const char *src, size_t size) {
   snprintf(dst, size, "%s", src);
 }
 
+/* Append comma-separated interface names/wildcards from `val` to ifaces[],
+ * trimming surrounding whitespace and skipping empty or over-long (>= IFNAMSIZ)
+ * tokens.  Duplicates are kept - a pinned list is priority-ordered and
+ * first-match-wins, so a repeat is a harmless re-check.  *count is advanced up
+ * to `max`; the return value is the number of tokens dropped because the array
+ * was already full (0 = all fit), letting the caller warn or fail as it likes.
+ */
+int ds_parse_iface_csv(const char *val, char ifaces[][IFNAMSIZ], int *count,
+                       int max) {
+  char copy[1024];
+  safe_strncpy(copy, val, sizeof(copy));
+  int dropped = 0;
+  char *sp;
+  for (char *tok = strtok_r(copy, ",", &sp); tok;
+       tok = strtok_r(NULL, ",", &sp)) {
+    while (*tok == ' ' || *tok == '\t')
+      tok++;
+    char *end = tok + strlen(tok) - 1;
+    while (end > tok && (*end == ' ' || *end == '\t'))
+      *end-- = '\0';
+    if (!tok[0] || strlen(tok) >= IFNAMSIZ)
+      continue;
+    if (*count >= max) {
+      dropped++;
+      continue;
+    }
+    safe_strncpy(ifaces[(*count)++], tok, IFNAMSIZ);
+  }
+  return dropped;
+}
+
 /* Mirrors ContainerManager.sanitizeContainerName() in the Android app.
  * Replaces spaces with dashes so directory names are consistent. */
 void sanitize_container_name(const char *name, char *out, size_t size) {

@@ -256,6 +256,12 @@
     <string name="error_gateway_bridge_taken">Bridge already used by \'%1$s\'. Use a different LAN name.</string>
     <string name="error_gateway_iface_taken">Interface already used by another segment (\'%1$s\'). Use a different one.</string>
     <string name="nat_settings">NAT Settings</string>
+    <string name="upstream_interface_title">Upstream Interface (Optional)</string>
+    <string name="upstream_interface_hint">Pin internet access to specific interface(s). Leave empty to auto-detect the active uplink.</string>
+    <string name="add_upstream_interface">Add Upstream Interface</string>
+    <string name="available_system_interfaces">Available System Interfaces:</string>
+    <string name="enter_manually">Or enter it manually (wildcards are supported too):</string>
+    <string name="interface_name_hint">Interface Name (e.g. wlan0, v4-rmnet_data*)</string>
     <string name="port_forwarding">Port Forwarding</string>
     <string name="add_port_forward">Add Port Forward</string>
     <string name="host_port_hint">Host Port (1-65535 or range 100-200)</string>

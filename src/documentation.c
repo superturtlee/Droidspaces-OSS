@@ -283,16 +283,52 @@ static void print_page(int page, const char *bin) {
     printf("----------\n\n");
 
     printf("%sIsolation Modes (--net):%s\n", bold, reset);
-    printf("  --net=host   Shared with host (default)\n");
-    printf("  --net=none   No network access (air-gapped)\n");
-    printf("  --net=nat    Isolated namespace with internet access\n\n");
+    printf("  --net=host     Shared with host (default)\n");
+    printf("  --net=none     No network access (air-gapped)\n");
+    printf("  --net=nat      Isolated namespace with internet access\n");
+    printf("  --net=gateway  LAN delegated to another container "
+           "(e.g. OpenWRT)\n\n");
 
     printf("%sNAT Mode Configuration:%s\n", bold, reset);
     printf("  %s --name=mycontainer --rootfs=/path/to/rootfs --net=nat "
            "start\n",
            bin);
     printf("  The internet uplink is detected automatically and tracked "
-           "in real time.\n\n");
+           "in real time\n");
+    printf("  as the host switches networks (Wi-Fi <-> mobile data, "
+           "ethernet, etc.).\n\n");
+
+    printf("%sManual Uplink Pinning (--upstream, NAT only):%s\n", bold, reset);
+    printf("  Pin WAN to specific interface(s) and disable auto-detect. "
+           "The list is\n");
+    printf("  comma-separated, priority-ordered, and supports wildcards.\n");
+    printf("  --upstream=wlan0          Always use Wi-Fi\n");
+    printf("  --upstream=wlan0,rmnet*   Prefer Wi-Fi, fall back to mobile "
+           "data\n");
+    printf("  --upstream=tun0           Route only through a phone VPN "
+           "(killswitch)\n");
+    printf("  --upstream=rmnet*         Stay on mobile data while the phone "
+           "uses Wi-Fi\n");
+    printf("  (Use rmnet* - the mobile-data interface number is not stable "
+           "across reconnects.)\n\n");
+
+    printf("%sGateway Mode Configuration:%s\n", bold, reset);
+    printf("  Delegate the LAN to another running container (e.g. OpenWRT), "
+           "which owns\n");
+    printf("  DHCP, DNS, firewall and routing. Start the gateway first, "
+           "then the client.\n");
+    printf("  %s --name=openwrt --rootfs=/path/to/openwrt --net=nat start\n",
+           bin);
+    printf("  %s --name=kali --rootfs=/path/to/kali --net=gateway "
+           "--gateway=openwrt start\n",
+           bin);
+    printf("  --gateway=NAME         Gateway container (required)\n");
+    printf("  --gateway-net=NAME     LAN segment / bridge suffix "
+           "(default: lan)\n");
+    printf("  --gateway-iface=IFACE  Interface name inside the gateway "
+           "(default: eth1)\n");
+    printf("  --gateway-bridge=BR    Override host bridge name "
+           "(default: ds-NAME)\n\n");
 
     printf("%sPort Forwarding (NAT only):%s\n", bold, reset);
     printf("  --port=8080:80          Single port\n");

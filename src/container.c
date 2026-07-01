@@ -1566,6 +1566,14 @@ int show_info(struct ds_config *cfg, int trust_cfg_pid) {
           cfg->static_nat_ip[0] ? cfg->static_nat_ip : cfg->nat_container_ip;
       if (ip[0])
         printf("NAT_IP=%s\n", ip);
+
+      if (cfg->upstream_iface_count > 0) {
+        printf("UPSTREAM_INTERFACES=");
+        for (int i = 0; i < cfg->upstream_iface_count; i++)
+          printf("%s%s", cfg->upstream_ifaces[i],
+                 (i < cfg->upstream_iface_count - 1) ? "," : "");
+        printf("\n");
+      }
     } else if (cfg->net_mode == DS_NET_GATEWAY) {
       printf("GATEWAY_CONTAINER=%s\n", cfg->gateway_container);
       printf("GATEWAY_NET=%s\n",
@@ -1726,6 +1734,15 @@ int show_info(struct ds_config *cfg, int trust_cfg_pid) {
           cfg->static_nat_ip[0] ? cfg->static_nat_ip : cfg->nat_container_ip;
       if (ip[0]) {
         printf("  NAT IP: %s\n", ip);
+        feat_count++;
+      }
+
+      if (cfg->upstream_iface_count > 0) {
+        printf("  Upstream (pinned): ");
+        for (int i = 0; i < cfg->upstream_iface_count; i++)
+          printf("%s%s", cfg->upstream_ifaces[i],
+                 (i < cfg->upstream_iface_count - 1) ? ", " : "");
+        printf("\n");
         feat_count++;
       }
 

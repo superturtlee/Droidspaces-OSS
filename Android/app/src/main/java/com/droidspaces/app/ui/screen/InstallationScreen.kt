@@ -1,6 +1,7 @@
 package com.droidspaces.app.ui.screen
 import androidx.compose.ui.graphics.Color
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -48,6 +50,15 @@ fun InstallationScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isInstallingModule by remember { mutableStateOf(false) }
     var rebootRecommended by remember { mutableStateOf(false) }
+
+    // Completely block the back gesture in every state. This screen must be
+    // left only via the Continue button, whose handler decides the next
+    // destination and triggers the post-install refresh. A raw back-stack pop
+    // would skip that and strand the user on a stale screen (e.g. the
+    // "update available" card still showing after the update finished).
+    BackHandler(enabled = true) {
+        // Intentionally no-op while installing, on success and on error.
+    }
 
     // Check backend status and determine what to install
     LaunchedEffect(Unit) {
@@ -156,7 +167,9 @@ fun InstallationScreen(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            if (isSuccess) {
+            // Show the Continue button once the work is finished, whether it
+            // succeeded or failed - it is the only accepted way off this screen.
+            if (isSuccess || errorMessage != null) {
                 val btnShape = RoundedCornerShape(20.dp)
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -186,7 +199,7 @@ fun InstallationScreen(
                             Box(modifier = Modifier.padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(
-                                        imageVector = Icons.Default.Check,
+                                        imageVector = if (isSuccess) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward,
                                         contentDescription = null,
                                         modifier = Modifier.size(18.dp),
                                         tint = MaterialTheme.colorScheme.onPrimary

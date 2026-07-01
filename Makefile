@@ -259,8 +259,8 @@ tarball:
 	echo "[+] Created: $$TARBALL ($$(du -h $$TARBALL | cut -f1))"
 
 all-tarball: all-build
-	@DATE=$$(date +%Y-%m-%d); \
-	TARBALL="$(BINARY_NAME)-v$(VERSION)-$$DATE.tar.gz"; \
+	@COMMIT_HASH=$$(git rev-parse --short HEAD 2>/dev/null || date +%Y-%m-%d); \
+	TARBALL="$(BINARY_NAME)-v$(VERSION)-$$COMMIT_HASH.tar.gz"; \
 	ROOT_DIR="$(BINARY_NAME)-v$(VERSION)"; \
 	TEMP_DIR="/tmp/droidspaces-tarball-$$$$"; \
 	mkdir -p $$TEMP_DIR/$$ROOT_DIR; \

@@ -136,6 +136,8 @@ int internal_boot(struct ds_config *cfg) {
       if (nr != (ssize_t)sizeof(hs)) {
         ds_warn("[NET] Child: incomplete handshake (read %zd, expected %zu)",
                 nr, sizeof(hs));
+      } else if (cfg->net_mode == DS_NET_GATEWAY) {
+        ds_log("[NET] Child: handshake received (gateway mode)");
       } else {
         ds_log("[NET] Child: handshake received: peer=%s ip=%s", hs.peer_name,
                hs.ip_str);
@@ -211,6 +213,26 @@ int internal_boot(struct ds_config *cfg) {
       0) {
     ds_error("Failed to bind mount rootfs: %s", strerror(errno));
     goto boot_fail;
+  }
+
+  /* 4b. Force the image rootfs read-write - the single unified point covering
+   * fresh boot, restart, AND internal reboot.
+   *
+   * On shutdown/reboot OpenWRT remounts its root read-only, leaving our mount
+   * point under /mnt/Droidspaces/<name> read-only too.  External and internal
+   * reboots never unmount the rootfs.img (to keep restarts fast), so the next
+   * boot reuses that still-read-only mount and pivot_root fails to create
+   * .old_root ("Read-only file system") - the container never boots.
+   *
+   * Skipped for directory rootfs (a fresh self-bind in this new namespace, its
+   * host backing fs already writable) and volatile mode (pivot_root targets the
+   * read-write overlay, not the read-only lower image).  Safe: the guest synced
+   * the fs before flipping it read-only.  A no-op when already read-write. */
+  if (cfg->is_img_mount && !cfg->volatile_mode) {
+    if (mount(NULL, cfg->rootfs_path, NULL,
+              MS_REMOUNT | MS_NOATIME | MS_NODIRATIME, NULL) < 0)
+      ds_warn("Failed to remount rootfs %s read-write: %s", cfg->rootfs_path,
+              strerror(errno));
   }
 
   /* 5. Set working directory to rootfs (required before pivot_root) */

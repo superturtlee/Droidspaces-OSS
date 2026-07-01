@@ -264,7 +264,7 @@
     <string name="feat_overhead_desc">Kommuniziert direkt mit dem Host Linux-Kernel. Kein Hypervisor, keine Virtualisierungsschicht.</string>
     <string name="feat_unkillable_title">Von Grund auf unkillbar</string>
     <string name="feat_unkillable_desc">Unterstützt die native Integration von init.rc und zweistufige Daemons im Userspace. Absolut unkillbar.</string>
-    <string name="feat_init_title">systemd / OpenRC mit PID 1</string>
+    <string name="feat_init_title">systemd / OpenWrt procd / OpenRC mit PID 1</string>
     <string name="feat_init_desc">Vollständige Unterstützung des Init-Systems. Echte Dienstverwaltung, keine simulierte Umgebung.</string>
     <string name="feat_isolation_title">Vollständige Isolation</string>
     <string name="feat_isolation_desc">Privater PID-Baum, Einhängepunkte, Hostname, IPC und cgroup-Hierarchie pro Container.</string>
@@ -325,6 +325,12 @@
     <string name="network_mode_nat_short">NAT</string>
     <string name="network_mode_none_short">Ohne</string>
     <string name="nat_settings">NAT Einstellungen</string>
+    <string name="upstream_interface_title">Upstream-Schnittstelle (optional)</string>
+    <string name="upstream_interface_hint">Internetzugang an bestimmte Schnittstelle(n) binden. Leer lassen, um den aktiven Uplink automatisch zu erkennen.</string>
+    <string name="add_upstream_interface">Upstream-Schnittstelle hinzufügen</string>
+    <string name="available_system_interfaces">Verfügbare Systemschnittstellen:</string>
+    <string name="enter_manually">Oder manuell eingeben (Platzhalter werden ebenfalls unterstützt):</string>
+    <string name="interface_name_hint">Schnittstellenname (z.B. wlan0, v4-rmnet_data*)</string>
     <string name="port_forwarding">Portweiterleitung</string>
     <string name="add_port_forward">Portweiterleitung hinzufügen</string>
     <string name="host_port_hint">Host-Port (1–65535 oder Bereich 100–200)</string>

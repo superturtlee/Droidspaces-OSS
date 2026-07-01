@@ -13,6 +13,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.droidspaces.app.ui.component.EmptyState
 import com.droidspaces.app.ui.component.ErrorState
 import com.droidspaces.app.ui.component.RootUnavailableState
@@ -46,18 +49,17 @@ fun ControlPanelScreen(
     // Get running containers - derived from ViewModel state
     val runningContainers = containerViewModel.containerList.filter { it.isRunning }
 
-    // Start system stats monitoring (only once per screen lifetime)
-    // Synchronized with DisposableEffect to ensure polling stops when navigating away
-    DisposableEffect(Unit) {
-        systemStatsViewModel.startMonitoring()
-        onDispose {
-            systemStatsViewModel.stopMonitoring()
-        }
-    }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Start container monitoring loop; restarts if running container list changes
+    // Poll only while this screen is composed (i.e. the Panel tab is selected)
+    // AND the app is in the foreground (Lifecycle STARTED).  repeatOnLifecycle
+    // cancels the loop on background / tab-away and restarts it on return, so
+    // re-opening the app on the Panel tab resumes polling without a tab switch.
+    // Restarts whenever the running container set changes.
     LaunchedEffect(runningContainers) {
-        systemStatsViewModel.startContainerMonitoring(runningContainers)
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            systemStatsViewModel.monitorContainers(runningContainers)
+        }
     }
 
     val containerUsageMap = systemStatsViewModel.containerUsageMap

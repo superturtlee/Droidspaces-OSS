@@ -327,6 +327,7 @@ fun DroidspacesNavigation(
                 initialBlockNestedNs = viewModel.blockNestedNs,
                 initialPrivileged = viewModel.privileged,
                 initialEnvFileContent = viewModel.envFileContent ?: "",
+                initialUpstreamInterfaces = viewModel.upstreamInterfaces,
                 initialPortForwards = viewModel.portForwards,
                 initialGatewayContainer = viewModel.gatewayContainer,
                 initialGatewayNet = viewModel.gatewayNet,
@@ -334,8 +335,8 @@ fun DroidspacesNavigation(
                 initialGatewayBridge = viewModel.gatewayBridge,
                 containerName = viewModel.containerName,
                 installedContainers = sharedContainerViewModel.containerList,
-                onNext = { netMode, disableIPv6, enableAndroidStorage, enableHwAccess, enableGpuMode, enableTermuxX11, tx11ExtraFlags, enableVirgl, virglExtraFlags, enablePulseaudio, selinuxPermissive, volatileMode, bindMounts, dnsServers, runAtBoot, customInit, staticNatIp, forceCgroupv1, blockNestedNs, privileged, envFileContent, portForwards, gatewayContainer, gatewayNet, gatewayIface, gatewayBridge ->
-                    viewModel.setConfig(netMode, disableIPv6, enableAndroidStorage, enableHwAccess, enableGpuMode, enableTermuxX11, tx11ExtraFlags, enableVirgl, virglExtraFlags, enablePulseaudio, selinuxPermissive, volatileMode, bindMounts, dnsServers, runAtBoot, customInit, staticNatIp, envFileContent, portForwards, forceCgroupv1, blockNestedNs, privileged, gatewayContainer, gatewayNet, gatewayIface, gatewayBridge)
+                onNext = { netMode, disableIPv6, enableAndroidStorage, enableHwAccess, enableGpuMode, enableTermuxX11, tx11ExtraFlags, enableVirgl, virglExtraFlags, enablePulseaudio, selinuxPermissive, volatileMode, bindMounts, dnsServers, runAtBoot, customInit, staticNatIp, forceCgroupv1, blockNestedNs, privileged, envFileContent, upstreamInterfaces, portForwards, gatewayContainer, gatewayNet, gatewayIface, gatewayBridge ->
+                    viewModel.setConfig(netMode, disableIPv6, enableAndroidStorage, enableHwAccess, enableGpuMode, enableTermuxX11, tx11ExtraFlags, enableVirgl, virglExtraFlags, enablePulseaudio, selinuxPermissive, volatileMode, bindMounts, dnsServers, runAtBoot, customInit, staticNatIp, envFileContent, upstreamInterfaces, portForwards, forceCgroupv1, blockNestedNs, privileged, gatewayContainer, gatewayNet, gatewayIface, gatewayBridge)
                     navController.navigate(Screen.SparseImageConfig.route)
                 },
                 onBack = {

@@ -176,7 +176,7 @@ The entire runtime is a **single static binary** under 400KB, compiled against m
 | **Init System Support** | Run systemd, OpenRC or any other init system as PID 1. Full service management and proper boot/shutdown/reboot sequences. |
 | **Deep Android Integration** | Supports two daemon modes: **Native init.rc** (lowest-level integration with auto-spawn/unkillable persistence) and **Userspace Daemon** (app-togglable, starts via `post-fs-data.sh`, no image modification required). **Both modes bypass root-domain seccomp blocks to ensure stable container lifecycles** [[init.rc Developer Guide](./init/README.md)]. |
 | **Namespace Isolation** | Complete isolation via PID, MNT, UTS, IPC, and Cgroup namespaces. Each container has its own process tree, mount table, hostname, IPC resources, and cgroup hierarchy. |
-| **Network Isolation** | **3 Networking Modes (Host, NAT, None)**. Pure network isolation via `CLONE_NEWNET` (NAT/None modes) or shared host networking (Host mode). Works on both Android and Linux. |
+| **Network Isolation** | **4 Networking Modes (Host, NAT, None, Gateway)**. Pure network isolation via `CLONE_NEWNET` (NAT/None/Gateway modes) or shared host networking (Host mode). NAT auto-detects the active uplink (or pin it with `--upstream`); Gateway delegates LAN/DHCP/firewall to another container like OpenWRT. Works on both Android and Linux. |
 | **Android Display & GPU** | Three acceleration modes: **llvmpipe** (software, all devices), **VirGL** (Mali/PowerVR), and **Turnip** (native Qualcomm/Adreno). As of v6.3.0, the X server and VirGL server launch automatically when the container starts - zero manual Termux commands required. Environment variables (`DISPLAY=:5`, `GALLIUM_DRIVER=virpipe`) are injected automatically. [[More info](./Documentation/Graphics-and-Audio.md)] |
 | **Android Sound** | PulseAudio daemon runs on the host as the Termux user so Android's audio HAL grants it device access. The socket is bind-mounted into the container at `/tmp/.pulse-socket` and `PULSE_SERVER` is injected automatically - audio just works. [[More info](./Documentation/Graphics-and-Audio.md#pulseaudio)] |
 | **Linux GPU Acceleration** | Zero-configuration GPU acceleration for AMD and Intel GPUs on Linux desktop hosts. [[More info](./Documentation/Graphics-and-Audio.md)] |
@@ -388,6 +388,7 @@ For GPU acceleration methods, sound setup, DE auto-boot internals, and Linux des
 | Document | Description |
 |----------|-------------|
 | [Feature Deep Dives](Documentation/Features.md) | Detailed explanation of each major feature. |
+| [Networking From Zero](Documentation/Networking-From-Zero.md) | Beginner-friendly guide to every networking concept behind Droidspaces - NAT, automatic uplink detection, `--upstream` pinning, and gateway mode with OpenWRT. |
 | [Display, Audio & Desktop Guide](Documentation/Graphics-and-Audio.md) | GPU acceleration, PulseAudio sound, and desktop environment auto-boot on Android and Linux. |
 | [Cool Things You Can Do (Tailscale, Docker, etc.)](Documentation/Cool-things-you-can-do.md) | Practical recipes for running Tailscale, Docker, and other tools inside containers. |
 | [Uninstallation Guide](Documentation/Uninstallation.md) | How to remove Droidspaces from your system. |

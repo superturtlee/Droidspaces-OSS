@@ -23,6 +23,9 @@ keywords: droidspaces, networking, gateway, openwrt, nat, dhcp, dns, lan, wan, v
 - [Part 4: DNS (How Names Become Addresses)](#part-4-dns-how-names-become-addresses)
 - [Part 5: NAT (The Magic Your Router Does)](#part-5-nat-the-magic-your-router-does)
     - [NAT in Droidspaces](#nat-in-droidspaces)
+    - [How NAT mode picks the WAN uplink (automatic)](#how-nat-mode-picks-the-wan-uplink-automatic)
+    - [Pinning the uplink manually with --upstream](#pinning-the-uplink-manually-with---upstream)
+    - [Use cases for --upstream](#use-cases-for---upstream)
 - [Part 6: Bridges and Virtual Cables (Linux Plumbing)](#part-6-bridges-and-virtual-cables-linux-plumbing)
     - [What is a network bridge?](#what-is-a-network-bridge)
     - [What is a veth pair?](#what-is-a-veth-pair)
@@ -240,6 +243,63 @@ In Droidspaces NAT mode, Droidspaces acts *exactly like your home router* - but 
 - Droidspaces also runs an embedded DHCP server for the container and configures its DNS
 - On Android, a background route monitor detects the active internet uplink automatically (by reading the kernel's routing rules) and re-points container traffic the moment the active network changes (for example, Wi-Fi to mobile data handoff)
 
+### How NAT mode picks the WAN uplink (automatic)
+
+A NAT container has to know *which* of Android's real interfaces currently has internet, so it can MASQUERADE through it. Phones make this hard: the active network hops between Wi-Fi, mobile data, USB-ethernet and VPN tunnels, and the interface names themselves are unstable (the mobile-data interface might be `rmnet0` one minute and `rmnet8` after a reconnect).
+
+By default Droidspaces handles all of this for you - **there is nothing to configure**:
+
+- It reads the kernel's *own* ground truth for "what is the internet interface right now." On Android that is the policy-routing rule `netd` installs for the active default network; on desktop Linux it is the main routing table's default route.
+- A background **route monitor** subscribes to kernel routing events (rule, route, link and address changes). The instant the host switches networks - you walk out of Wi-Fi range and it falls back to mobile data, or you plug in a USB-ethernet dongle on a laptop - the monitor re-points the container's traffic. No restart, no config.
+- CLAT/464xlat interfaces (the `v4-rmnet...` interfaces phones synthesise on IPv6-only mobile networks) are picked up automatically.
+
+This automatic mode is the right choice for the vast majority of users. The rest of this section is only relevant if you want to *override* it.
+
+### Pinning the uplink manually with `--upstream`
+
+Sometimes you do **not** want the container to follow whatever network the host is using. You want to force its internet out through one specific interface and keep it there. That is what `--upstream` does.
+
+When you pass `--upstream`, automatic detection is switched off entirely. The interface(s) you list become the *only* candidates the container will ever use for WAN - it never hops to whatever the host marks as its active default network.
+
+```bash
+# Force the container's internet out through Wi-Fi, always
+droidspaces --name=box --rootfs=/data/box --net=nat --upstream=wlan0 start
+```
+
+You can list **multiple interfaces, comma-separated**, and use **wildcards** (`*`, `?`):
+
+```bash
+droidspaces --name=box --rootfs=/data/box --net=nat --upstream=wlan0,rmnet* start
+```
+
+The list is **priority-ordered**. The route monitor walks it top to bottom and uses the first interface that is currently up and actually has internet. So `wlan0,rmnet*` means "prefer Wi-Fi; if Wi-Fi is down, fall back to mobile data" - and when Wi-Fi returns, it switches back. The failover stays strictly *inside your list*; it never falls back to an interface you did not list. This is the key difference from auto mode - the WAN is yours to decide, not the host's.
+
+If a pinned interface is missing when the container starts, or disappears mid-session and later reappears, that is handled too: the container simply has no WAN until one of your pinned interfaces is up, then it wires up automatically.
+
+> **Why wildcards matter on mobile data:** Android does not give the mobile-data interface a stable number - it might be `rmnet0`, `rmnet8`, `rmnet_data2`, and the number can change across reconnects. Pinning a literal `rmnet0` will break the next time it comes up as something else. Pin `rmnet*` instead and it keeps working.
+
+### Use cases for `--upstream`
+
+**1. Route the container's WAN through an Android VPN (`tun0`)**
+
+Connect a VPN on the phone itself - ProtonVPN, WireGuard, OpenVPN, any app that creates a `tun0` interface. Then pin the container to it:
+
+```bash
+droidspaces --name=box --rootfs=/data/box --net=nat --upstream=tun0 start
+```
+
+Now all of the container's traffic goes out through the VPN tunnel, and *only* the tunnel. If the VPN drops, `tun0` disappears and the container loses internet instead of leaking out over your real connection - a simple killswitch, for free.
+
+**2. Container on mobile data while the phone stays on Wi-Fi**
+
+Android can keep the cellular radio up even while you are on Wi-Fi. Enable **"Mobile data always active"** in Developer Options, connect to Wi-Fi, then turn mobile data on. Both networks are now live at once. Pin the container to the mobile-data interface:
+
+```bash
+droidspaces --name=box --rootfs=/data/box --net=nat --upstream=rmnet* start
+```
+
+The container's traffic goes out over mobile data while the rest of the phone keeps using Wi-Fi. Handy for testing from a different IP/network, putting a container's bandwidth onto cellular, or simply running something on a separate connection from everything else on the phone.
+
 ---
 
 ## Part 6: Bridges and Virtual Cables (Linux Plumbing)
@@ -365,7 +425,7 @@ Android host kernel
 +-- ds-lan (host bridge - NO IP address, just a switch)
 |    |
 |    +-- ds-g[hash] (veth host-side, connected to OpenWRT's netns as eth1)
-|    +-- ds-v[pid]  (veth host-side, connected to Kali's netns as eth0)
+|    +-- ds-c[pid]  (veth host-side, connected to Kali's netns as eth0)
 |
 +-- [Kali container - net=gateway mode]
      netns: owns eth0 (LAN side - plugged into ds-lan bridge)
@@ -445,7 +505,12 @@ This mimics how you might physically plug a cable into a router's LAN port after
 
 In NAT mode, Droidspaces writes `/etc/resolv.conf` inside the container, pointing to `1.1.1.1` or `8.8.8.8`.
 
-In gateway mode, Droidspaces does NOT write `resolv.conf` (unless you explicitly pass `--dns`). This is because OpenWRT's `dnsmasq` hands the DNS server address to the container via the DHCP lease. If Droidspaces also wrote a `resolv.conf`, it would conflict with what dnsmasq is providing - the container would use the wrong DNS and bypass OpenWRT's DNS filtering/caching entirely.
+In gateway mode, Droidspaces does NOT write a static `resolv.conf` (unless you explicitly pass `--dns`). This is because OpenWRT's `dnsmasq` hands the DNS server address to the container via the DHCP lease. If Droidspaces also wrote a `resolv.conf`, it would conflict with what dnsmasq is providing - the container would use the wrong DNS and bypass OpenWRT's DNS filtering/caching entirely.
+
+How this is wired depends on the client's init system:
+
+- **systemd containers:** `/etc/resolv.conf` is symlinked to `/run/systemd/resolve/resolv.conf`, which systemd-resolved populates from the DHCP lease.
+- **non-systemd containers:** Droidspaces leaves `/etc/resolv.conf` entirely alone, so the container's own DHCP client (udhcpc/dhclient) writes the gateway-supplied nameserver from the lease. (Earlier builds wrote a hardcoded `1.1.1.1`/`8.8.8.8` here, which silently bypassed the gateway's DNS - that is fixed.) If a minimal rootfs ships no DHCP resolv.conf hook, pass `--dns` to set one explicitly.
 
 ### Why bridge-nf-call-iptables is set to 0
 
@@ -453,19 +518,28 @@ The bridge `ds-lan` carries traffic between OpenWRT and Kali. By default, Linux 
 
 Setting it to `0` tells Linux: "do not run iptables on bridged traffic." This keeps OpenWRT's firewall as the *only* firewall that sees this traffic, which is exactly what we want.
 
-### The gateway container must be running first
+### Start order and automatic self-healing
 
-Start order matters. When a gateway-mode container starts, Droidspaces looks up the gateway container's live process ID to reach its network namespace. If the gateway container is not running at that moment, the network setup fails with a warning and the client container boots anyway - but with no network at all (only loopback). It does not retry on its own.
+All wiring for a gateway-mode client is done **from the host side** by a single function, `gateway_wire_client()`: it ensures the bridge and the gateway-side cable, creates the client's app veth, and moves+renames the peer into the client's namespace as `eth0` (pinned MAC, brought up) — the client's own boot code only brings up `lo`. Because the host owns every step, the same function wires a client whether it is just starting or already running.
 
-The same logic applies after a gateway restart. A veth pair dies together: when the gateway container stops, the `eth1` end inside it is destroyed, and that destroys the host-side end too. Existing clients stay plugged into the bridge but have no router anymore. The LAN cable is re-plugged the next time **any** gateway-mode container starts on that segment - so after restarting the gateway, restart one client (or start a new one) to bring the segment back to life.
+This gives a deliberately simple rule keyed on **gateway liveness**:
+
+- **Gateway already running when a client starts** → the client wires immediately (its own monitor calls `gateway_wire_client`).
+- **Gateway not running when a client starts** → the client wires **nothing at all** (no bridge, no veth, no `eth0`) and just boots. The work is deferred entirely to the gateway.
+
+Healing is therefore driven by **the gateway itself**, not by the clients. On every boot cycle the gateway container's monitor calls `ds_net_rewire_gateway_clients()`: it scans the running containers, finds the ones that delegate to this gateway, and runs `gateway_wire_client` for each — establishing the gateway-side `eth1` cable and every client's `eth0` into the gateway's *current* namespace. So when the gateway **starts or reboots**, every running client is (re)wired with **no client restart required**.
+
+Skipping all client wiring while the gateway is down (rather than half-wiring a bridge and a danging veth) also closes a race: a client started before its gateway can have its gateway/LAN settings (`--gateway-net`, `--host-bridge`, …) edited before the gateway comes up, and the gateway then wires every client from each client's *current* config — never a stale one.
+
+There is exactly **one actor** (the gateway) doing the wiring, so there is nothing to poll and no thundering herd. Wiring is serialised per segment (an advisory file lock) to keep concurrent client starts and the gateway's re-wire from racing. Both `eth1` (gateway side) and each `eth0` (client side) keep a **stable MAC** and are moved+renamed into their namespace in a single atomic step, so the container's own `netifd`/DHCP sees one persistent device rather than re-initialising a churning one.
 
 ### What happens when containers stop
 
 Cleanup in gateway mode is deliberately minimal, matching the "plumbing only" philosophy:
 
-- **A client stops:** only that client's own veth (`ds-v<PID>`) is removed. The bridge and the gateway's `eth1` stay up, so other clients on the segment are untouched.
-- **The gateway stops:** the gateway-side veth disappears with its namespace (see above), but the bridge itself stays.
-- The delegated bridge (`ds-lan` etc.) is never torn down by Droidspaces. It is harmless when idle - it has no IP and carries no policy - and persists until you delete it manually or reboot the device.
+- **A client stops:** only that client's own veth is removed (gateway clients use the `ds-c<PID>` prefix, distinct from NAT's `ds-v<PID>`). The bridge and the gateway's `eth1` stay up, so other clients on the segment are untouched.
+- **The last client stops while the gateway is still running:** the bridge is **kept** (not reaped). Tearing it down would flap the gateway's live `eth1` carrier and occasionally make netifd report "device initialization failed"; an idle IP-less bridge is harmless and the next client reuses it.
+- **The gateway stops:** the gateway-side veth disappears with its namespace. Once no clients remain *and* the gateway is gone, the now-idle bridge is reaped.
 
 ---
 

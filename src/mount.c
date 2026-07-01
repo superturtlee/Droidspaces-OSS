@@ -1018,10 +1018,14 @@ int mount_rootfs_img(const char *img_path, char *mount_point, size_t mp_size,
     return -1;
   }
 
-  /* e2fsck: only for ext images */
+  /* e2fsck: only for ext images.  No -f: e2fsck consults the superblock and
+   * exits in milliseconds when the fs was unmounted cleanly, replays the
+   * journal when it was not, and runs a full repair only when the kernel
+   * flagged an error (errors=remount-ro) or the fs is otherwise marked unclean
+   * - so a clean start pays nothing instead of a forced full scan every boot.
+   */
   if (strcmp(fstype, "ext4") == 0) {
-    char *e2fsck_argv[] = {"e2fsck", "-f", "-y", (char *)(uintptr_t)img_path,
-                           NULL};
+    char *e2fsck_argv[] = {"e2fsck", "-y", (char *)(uintptr_t)img_path, NULL};
     if (run_command_quiet(e2fsck_argv) == 0)
       ds_log("Image checked and repaired successfully.");
   }

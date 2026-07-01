@@ -68,14 +68,24 @@ The repository supports third-party rootfs sources in the same JSON format.
 
 ## Networking Configuration
 
-When editing or creating a container, you can choose from three networking modes:
+When editing or creating a container, you can choose from four networking modes:
 
 - **Host (Default)**: Shares host network directly.
 - **NAT (Isolated)**: Private network namespace with deterministic IP and port forwarding support.
 - **None**: No network access.
+- **Gateway**: The container's LAN is delegated to another running container (typically OpenWRT), which owns DHCP, DNS, firewall and routing. Select the gateway container and (optionally) the LAN segment, interface and bridge in the **Gateway** settings. See [Networking From Zero](Networking-From-Zero.md) for the full guide.
 
 ### Internet Uplink (NAT Mode)
 If you select **NAT (Isolated)** mode, the internet uplink is detected fully automatically - there is nothing to configure. Droidspaces reads the kernel's own routing state to find the interface Android is currently using for internet (Wi-Fi, mobile data, ethernet) and a background Route Monitor keeps the container connected in real time as you switch networks.
+
+#### Upstream Interface (Optional)
+If you want the container to **ignore the active network** and pin its internet to specific interface(s), add them under **Upstream Interface**. This disables auto-detection and forces the WAN through your list only:
+
+- The list is **priority-ordered** and supports **wildcards** - e.g. `wlan0, rmnet*` prefers Wi-Fi and falls back to mobile data (use `rmnet*` because the mobile-data interface number is not stable).
+- **Example - VPN killswitch**: run a VPN app on the phone and pin `tun0` so the container can only reach the internet through the tunnel.
+- **Example - cellular while on Wi-Fi**: enable *Mobile data always active* in Developer Options, connect Wi-Fi, turn on mobile data, and pin `rmnet*` so the container uses cellular while the phone stays on Wi-Fi.
+
+Leave it empty to auto-detect the active uplink (the default, recommended for most users).
 
 > [!NOTE]
 > NAT mode is IPv4 only. If your carrier only provides IPv6, see the [IPv4 NAT Workaround](Troubleshooting.md#ipv4-quirks).

@@ -53,6 +53,7 @@ import com.droidspaces.app.ui.component.HardwareAccessDialog
 import com.droidspaces.app.ui.component.DsDropdown
 import com.droidspaces.app.ui.component.GatewaySettingsSection
 import androidx.compose.material.icons.filled.Public
+import com.droidspaces.app.ui.component.UpstreamInterfaceList
 import com.droidspaces.app.ui.component.PortForwardingList
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -106,6 +107,7 @@ fun EditContainerScreen(
     var dnsServers by remember { mutableStateOf(container.dnsServers) }
     var runAtBoot by remember { mutableStateOf(container.runAtBoot) }
     var envFileContent by remember { mutableStateOf(container.envFileContent ?: "") }
+    var upstreamInterfaces by remember { mutableStateOf(container.upstreamInterfaces) }
     var portForwards by remember { mutableStateOf(container.portForwards) }
     var forceCgroupv1 by remember { mutableStateOf(container.forceCgroupv1) }
     var blockNestedNs by remember { mutableStateOf(container.blockNestedNs) }
@@ -145,6 +147,7 @@ fun EditContainerScreen(
     var savedDnsServers by remember { mutableStateOf(container.dnsServers) }
     var savedRunAtBoot by remember { mutableStateOf(container.runAtBoot) }
     var savedEnvFileContent by remember { mutableStateOf(container.envFileContent ?: "") }
+    var savedUpstreamInterfaces by remember { mutableStateOf(container.upstreamInterfaces) }
     var savedPortForwards by remember { mutableStateOf(container.portForwards) }
     var savedForceCgroupv1 by remember { mutableStateOf(container.forceCgroupv1) }
     var savedBlockNestedNs by remember { mutableStateOf(container.blockNestedNs) }
@@ -186,6 +189,7 @@ fun EditContainerScreen(
             dnsServers != savedDnsServers ||
             runAtBoot != savedRunAtBoot ||
             envFileContent != savedEnvFileContent ||
+            upstreamInterfaces != savedUpstreamInterfaces ||
             portForwards != savedPortForwards ||
             forceCgroupv1 != savedForceCgroupv1 ||
             blockNestedNs != savedBlockNestedNs ||
@@ -233,6 +237,7 @@ fun EditContainerScreen(
                     dnsServers = dnsServers,
                     runAtBoot = runAtBoot,
                     envFileContent = if (envFileContent.isBlank()) null else envFileContent,
+                    upstreamInterfaces = upstreamInterfaces,
                     portForwards = portForwards,
                     forceCgroupv1 = forceCgroupv1,
                     blockNestedNs = blockNestedNs,
@@ -271,6 +276,7 @@ fun EditContainerScreen(
                         savedDnsServers = dnsServers
                         savedRunAtBoot = runAtBoot
                         savedEnvFileContent = envFileContent
+                        savedUpstreamInterfaces = upstreamInterfaces
                         savedPortForwards = portForwards
                         savedForceCgroupv1 = forceCgroupv1
                         savedBlockNestedNs = blockNestedNs
@@ -777,6 +783,24 @@ fun EditContainerScreen(
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
+
+                    // Upstream Interface (optional pin)
+                    Text(
+                        text = context.getString(R.string.upstream_interface_title),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = context.getString(R.string.upstream_interface_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    UpstreamInterfaceList(
+                        upstreamInterfaces = upstreamInterfaces,
+                        onInterfacesChange = { upstreamInterfaces = it }
+                    )
 
                     // Port Forwards
                     Text(

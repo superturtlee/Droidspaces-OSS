@@ -65,6 +65,10 @@ void print_usage(void) {
       "ds-NAME)\n"
       "      --nat-ip=IP           Assign a fixed IP in 172.28.*.* range (nat "
       "mode)\n"
+      "      --upstream IFACE      Pin NAT WAN to interface(s); disables "
+      "auto-detect\n"
+      "                            comma-separated, wildcards ok, e.g. "
+      "--upstream wlan0 or wlan0,rmnet*\n"
       "      --port [H:]C[/P]      Forward ports (supports ranges and "
       "symmetric ports)\n"
       "                            e.g. --port 22, 80:80/tcp, "
@@ -314,7 +318,12 @@ static void enforce_nat_safety(struct ds_config *cfg, int argc, char **argv) {
     }
   }
 
-  /* --port is only meaningful with --net=nat */
+  /* --upstream and --port are only meaningful with --net=nat.  --upstream is an
+   * optional override (auto-detection is the default) - never mandatory. */
+  if (cfg->upstream_iface_count > 0 && cfg->net_mode != DS_NET_NAT) {
+    ds_warn("--upstream is only valid with --net=nat - ignoring");
+    cfg->upstream_iface_count = 0;
+  }
   if (cfg->port_forward_count > 0 && cfg->net_mode != DS_NET_NAT) {
     ds_warn("--port is only valid with --net=nat - ignoring");
     cfg->port_forward_count = 0;
@@ -395,6 +404,7 @@ int main(int argc, char **argv) {
       {"user", required_argument, 0, 'u'},
       {"net", required_argument, 0, 257},
       {"port", required_argument, 0, 258},
+      {"upstream", required_argument, 0, 259},
       {"force-cgroupv1", no_argument, 0, 260},
       {"block-nested-namespaces", no_argument, 0, 261},
       {"privileged", required_argument, 0, 264},
@@ -939,6 +949,20 @@ int main(int argc, char **argv) {
 
       skip_tok:
         tok = strtok_r(NULL, ",", &saveptr);
+      }
+      break;
+    }
+
+    case 259: {
+      /* --upstream wlan0,rmnet*  (comma-separated, wildcards allowed).  Pins
+       * NAT WAN to this list in priority order and disables auto-detection. */
+      if (ds_parse_iface_csv(optarg, cfg.upstream_ifaces,
+                             &cfg.upstream_iface_count,
+                             DS_MAX_UPSTREAM_IFACES) > 0) {
+        ds_error("Too many --upstream interfaces (max %d)",
+                 DS_MAX_UPSTREAM_IFACES);
+        ret = 1;
+        goto cleanup;
       }
       break;
     }

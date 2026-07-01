@@ -1,5 +1,4 @@
 name: Droidspaces CI
-run-name: ${{ github.event.head_commit.message || format('Release {0}', github.event.inputs.tag_name) || github.workflow }}
 
 on:
   push:
@@ -105,9 +104,9 @@ jobs:
 
     - name: Stage & Rename Artifacts
       run: |
-        TAG="${{ github.event.inputs.tag_name || 'test' }}"
-        DATE=$(date +%Y-%m-%d)
-        APK_NAME="Droidspaces-universal-${TAG}-${DATE}.apk"
+        TAG="${{ github.event.inputs.tag_name || 'CI' }}"
+        COMMIT_HASH=$(git log -1 --pretty=%h)
+        APK_NAME="Droidspaces-universal-${TAG}-${COMMIT_HASH}.apk"
         TAR_NAME=$(ls droidspaces-v*-*.tar.gz)
         mkdir -p dist
         mv Android/app/build/outputs/apk/release/app-release.apk dist/${APK_NAME}

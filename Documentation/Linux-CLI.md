@@ -110,10 +110,22 @@ sudo droidspaces --name=web,db,app stop
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--net=MODE` | | Networking mode: `host` (default), `nat`, or `none`. |
+| `--net=MODE` | | Networking mode: `host` (default), `nat`, `none`, or `gateway`. |
+| `--upstream=IFACE` | | Pin the NAT WAN to specific interface(s); disables automatic uplink detection. Comma-separated, priority-ordered, supports wildcards. Example: `--upstream=wlan0,rmnet*`. NAT mode only. |
 | `--port HOST:CONT[/proto]` | | Forward host port to container (NAT mode). Supports TCP/UDP. |
 | `--dns=SERVERS` | `-d` | Custom DNS servers, comma-separated. Example: `--dns=1.1.1.1,8.8.8.8` |
 | `--disable-ipv6` | | Disable IPv6 networking support (Host mode only). |
+
+#### Gateway Mode
+
+Delegate a container's LAN to another running container (e.g. OpenWRT), which then owns DHCP, DNS, firewall and routing. Droidspaces only does the L2 plumbing. See [Networking From Zero](Networking-From-Zero.md) for the full guide.
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--gateway=NAME` | | **Required** for `--net=gateway`. The running container that acts as the router. |
+| `--gateway-net=NAME` | | LAN segment name / host bridge suffix (default: `lan`). Clients sharing a value share a LAN; different values are isolated segments. |
+| `--gateway-iface=IFACE` | | Interface name as seen *inside* the gateway container (default: `eth1`). Each segment needs a unique name. |
+| `--gateway-bridge=BR` | | Override the host bridge name (default: `ds-{gateway-net}`). |
 
 ### Feature Flags
 
@@ -238,6 +250,27 @@ sudo droidspaces \
   --net=nat \
   --port=8080:80 \
   start
+```
+
+### NAT with a Pinned Uplink
+Force the container's internet out through a specific interface instead of following the host's active network. Pin a VPN tunnel (`tun0`) as a killswitch, or `rmnet*` to stay on mobile data while the phone uses Wi-Fi:
+```bash
+sudo droidspaces \
+  --name=vpnbox \
+  --rootfs-img=/path/to/rootfs.img \
+  --net=nat \
+  --upstream=tun0 \
+  start
+```
+
+### Gateway Mode (LAN owned by OpenWRT)
+Start the router container first (in NAT mode), then attach clients to it:
+```bash
+# 1. the router
+sudo droidspaces --name=openwrt --rootfs=/data/openwrt --net=nat start
+
+# 2. a client whose LAN/DHCP/firewall is owned by openwrt
+sudo droidspaces --name=kali --rootfs=/data/kali --net=gateway --gateway=openwrt start
 ```
 
 ### Ephemeral Testing

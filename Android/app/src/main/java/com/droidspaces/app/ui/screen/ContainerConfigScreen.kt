@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.droidspaces.app.ui.component.ToggleCard
 import com.droidspaces.app.ui.component.DsDropdown
 import androidx.compose.material.icons.filled.Public
+import com.droidspaces.app.ui.component.UpstreamInterfaceList
 import com.droidspaces.app.ui.component.PortForwardingList
 import androidx.compose.ui.platform.LocalContext
 import com.droidspaces.app.R
@@ -75,6 +76,7 @@ fun ContainerConfigScreen(
     initialBlockNestedNs: Boolean = false,
     initialPrivileged: String = "",
     initialEnvFileContent: String = "",
+    initialUpstreamInterfaces: List<String> = emptyList(),
     initialPortForwards: List<PortForward> = emptyList(),
     initialGatewayContainer: String = "",
     initialGatewayNet: String = "",
@@ -104,6 +106,7 @@ fun ContainerConfigScreen(
         blockNestedNs: Boolean,
         privileged: String,
         envFileContent: String?,
+        upstreamInterfaces: List<String>,
         portForwards: List<PortForward>,
         gatewayContainer: String,
         gatewayNet: String,
@@ -132,6 +135,7 @@ fun ContainerConfigScreen(
     var forceCgroupv1 by remember { mutableStateOf(initialForceCgroupv1) }
     var blockNestedNs by remember { mutableStateOf(initialBlockNestedNs) }
     var envFileContent by remember { mutableStateOf(initialEnvFileContent) }
+    var upstreamInterfaces by remember { mutableStateOf(initialUpstreamInterfaces) }
     var portForwards by remember { mutableStateOf(initialPortForwards) }
     var privileged by remember { mutableStateOf(initialPrivileged) }
     var gatewayContainer by remember { mutableStateOf(initialGatewayContainer) }
@@ -319,7 +323,7 @@ fun ContainerConfigScreen(
                             .clickable(
                                 enabled = canProceed,
                                 onClick = {
-                                    onNext(netMode, disableIPv6, enableAndroidStorage, enableHwAccess, enableGpuMode, enableTermuxX11, tx11ExtraFlags, enableVirgl, virglExtraFlags, enablePulseaudio, selinuxPermissive, volatileMode, bindMounts, dnsServers, runAtBoot, customInit, staticNatIp, forceCgroupv1, blockNestedNs, privileged, if (envFileContent.isBlank()) null else envFileContent, portForwards, gatewayContainer, gatewayNet, gatewayIface, gatewayBridge)
+                                    onNext(netMode, disableIPv6, enableAndroidStorage, enableHwAccess, enableGpuMode, enableTermuxX11, tx11ExtraFlags, enableVirgl, virglExtraFlags, enablePulseaudio, selinuxPermissive, volatileMode, bindMounts, dnsServers, runAtBoot, customInit, staticNatIp, forceCgroupv1, blockNestedNs, privileged, if (envFileContent.isBlank()) null else envFileContent, upstreamInterfaces, portForwards, gatewayContainer, gatewayNet, gatewayIface, gatewayBridge)
                                 },
                                 indication = androidx.compose.material.ripple.rememberRipple(bounded = true),
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -519,6 +523,24 @@ fun ContainerConfigScreen(
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
                         )
                     }
+
+                    // Upstream Interface (optional pin)
+                    Text(
+                        text = context.getString(R.string.upstream_interface_title),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = context.getString(R.string.upstream_interface_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    UpstreamInterfaceList(
+                        upstreamInterfaces = upstreamInterfaces,
+                        onInterfacesChange = { upstreamInterfaces = it }
+                    )
 
                     // Port Forwards
                     Text(
