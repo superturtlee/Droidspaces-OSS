@@ -31,6 +31,14 @@
 
 #include "display_daemon.h"
 
+#include <sys/stat.h>
+
+/* Host directory for the per-container display sockets. Deliberately under
+ * /data/local/tmp (world-traversable, same tree the consumer app already uses
+ * for its default socket) so the consumer can reach the socket without hitting
+ * the permission problems of a workspace-private path. */
+#define ANLAND_SOCK_DIR "/data/local/tmp/anland"
+
 /* Per-container Pids-dir filenames (keyed by container name). */
 static void anland_pid_file(const struct ds_config *cfg, char *buf, size_t n) {
   snprintf(buf, n, "%s.anland.pid", cfg->container_name);
@@ -142,17 +150,18 @@ int ds_anland_daemon_start(struct ds_config *cfg) {
     return 1;
   }
 
-  /* Socket dir + generated per-container socket path. */
-  char dir[PATH_MAX];
-  snprintf(dir, sizeof(dir), "%s/anland", get_workspace_dir());
-  mkdir_p(dir, 0771);
+  /* Socket dir + generated per-container socket path. World-traversable dir so
+   * the consumer app can reach the socket. */
+  mkdir_p(ANLAND_SOCK_DIR, 0777);
+  chmod(ANLAND_SOCK_DIR, 0777);
 
   char uuid[DS_UUID_LEN + 1];
   if (generate_uuid(uuid, sizeof(uuid)) < 0) {
     ds_error("[anland] failed to generate socket name");
     return -1;
   }
-  snprintf(cfg->anland_sock, sizeof(cfg->anland_sock), "%s/%s.sock", dir, uuid);
+  snprintf(cfg->anland_sock, sizeof(cfg->anland_sock),
+           ANLAND_SOCK_DIR "/%s.sock", uuid);
 
   ds_log("[anland] launching display daemon on %s", cfg->anland_sock);
   pid_t child = spawn_anland_daemon(cfg->anland_sock);
@@ -167,8 +176,10 @@ int ds_anland_daemon_start(struct ds_config *cfg) {
   snprintf(rec, sizeof(rec), "%s/%s", get_pids_dir(), sockfile);
   write_file_atomic(rec, cfg->anland_sock);
 
-  /* Give the daemon a moment to bind before we bind-mount the socket. */
+  /* Give the daemon a moment to bind, then loosen the socket perms so the
+   * consumer app can connect to it. */
   wait_for_socket_or_death(child, cfg->anland_sock, 2000, 20000);
+  chmod(cfg->anland_sock, 0666);
   return 0;
 }
 

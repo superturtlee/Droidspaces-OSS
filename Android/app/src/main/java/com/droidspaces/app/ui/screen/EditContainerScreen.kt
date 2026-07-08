@@ -926,6 +926,18 @@ fun EditContainerScreen(
             )
 
             ToggleCard(
+                icon = Icons.Default.DesktopWindows,
+                title = context.getString(R.string.enable_anland),
+                description = context.getString(R.string.enable_anland_description),
+                checked = enableAnland,
+                onCheckedChange = {
+                    clearFocus()
+                    enableAnland = it
+                },
+                enabled = true
+            )
+
+            ToggleCard(
                 icon = Icons.Default.Layers,
                 title = context.getString(R.string.enable_virgl),
                 description = context.getString(R.string.enable_virgl_description),
@@ -1025,17 +1037,6 @@ fun EditContainerScreen(
                 onCheckedChange = {
                     clearFocus()
                     runAtBoot = it
-                }
-            )
-
-            ToggleCard(
-                icon = Icons.Default.DesktopWindows,
-                title = context.getString(R.string.enable_anland),
-                description = context.getString(R.string.enable_anland_description),
-                checked = enableAnland,
-                onCheckedChange = {
-                    clearFocus()
-                    enableAnland = it
                 }
             )
 
