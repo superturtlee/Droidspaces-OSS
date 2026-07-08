@@ -207,7 +207,7 @@
     <string name="run_at_boot_description">Start container on boot</string>
     <string name="enable_anland">Anland Display</string>
     <string name="enable_anland_description">Run the anland display daemon so you can open a desktop window</string>
-    <string name="launch_anland_window">启动 Anland 窗口</string>
+    <string name="launch_anland_window">Launch Anland</string>
     <string name="anland_not_installed">Anland consumer app is not installed</string>
     <string name="auto_boot_priority">Auto Boot Priority</string>
     <string name="auto_boot_priority_description">Order in which run-at-boot containers start</string>
