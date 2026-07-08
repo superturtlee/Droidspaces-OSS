@@ -118,6 +118,25 @@ static pid_t spawn_anland_daemon(const char *sock_path) {
   return child;
 }
 
+/* Load the recorded per-container socket path (Pids/<name>.anland) into
+ * cfg->anland_sock. No-op when the file is missing/empty. Needed because the
+ * socket path is runtime-only (not persisted to container.config), so a cfg
+ * loaded from disk at stop time has an empty anland_sock. */
+static void anland_load_sock(struct ds_config *cfg) {
+  char sockfile[NAME_MAX + 16], rec[PATH_MAX];
+  anland_sock_file(cfg, sockfile, sizeof(sockfile));
+  snprintf(rec, sizeof(rec), "%s/%s", get_pids_dir(), sockfile);
+  int fd = open(rec, O_RDONLY | O_CLOEXEC);
+  if (fd < 0)
+    return;
+  ssize_t r = read(fd, cfg->anland_sock, sizeof(cfg->anland_sock) - 1);
+  close(fd);
+  if (r > 0) {
+    cfg->anland_sock[r] = '\0';
+    cfg->anland_sock[strcspn(cfg->anland_sock, "\r\n")] = '\0';
+  }
+}
+
 /* ---- public API ------------------------------------------------------- */
 
 int ds_anland_daemon_start(struct ds_config *cfg) {
@@ -136,17 +155,7 @@ int ds_anland_daemon_start(struct ds_config *cfg) {
   pid_t existing = ds_daemon_read_pid(pidfile);
   if (existing > 0) {
     cfg->anland_pid = existing;
-    char rec[PATH_MAX];
-    snprintf(rec, sizeof(rec), "%s/%s", get_pids_dir(), sockfile);
-    int fd = open(rec, O_RDONLY | O_CLOEXEC);
-    if (fd >= 0) {
-      ssize_t r = read(fd, cfg->anland_sock, sizeof(cfg->anland_sock) - 1);
-      close(fd);
-      if (r > 0) {
-        cfg->anland_sock[r] = '\0';
-        cfg->anland_sock[strcspn(cfg->anland_sock, "\r\n")] = '\0';
-      }
-    }
+    anland_load_sock(cfg);
     ds_log("[anland] daemon already running (PID %d)", (int)existing);
     return 1;
   }
@@ -187,8 +196,14 @@ void ds_anland_daemon_stop(struct ds_config *cfg) {
   anland_pid_file(cfg, pidfile, sizeof(pidfile));
   anland_sock_file(cfg, sockfile, sizeof(sockfile));
 
+  /* Recover the socket path from the Pids file if this cfg was loaded from disk
+   * (anland_sock is runtime-only), so ds_global_daemon_stop can unlink it. */
+  if (cfg->anland_sock[0] == '\0')
+    anland_load_sock(cfg);
+
   ds_global_daemon_stop(anland_never_needed, cfg->anland_pid, &cfg->anland_pid,
-                        pidfile, cfg->anland_sock, "[anland]");
+                        pidfile, cfg->anland_sock[0] ? cfg->anland_sock : NULL,
+                        "[anland]");
   ds_daemon_remove_pid(sockfile);
 }
 
