@@ -150,6 +150,8 @@
     <string name="cgroup_v1_option">Cgroup V1</string>
     <string name="deadlock_shield_option">Deadlock Shield</string>
     <string name="privileged_option">Privileged</string>
+    <string name="anland_option">Anland</string>
+    <string name="userns_option">User Namespaces</string>
     <string name="installation_setup_summary">Installation Summary</string>
     <string name="review_configuration">Review Configuration</string>
     <string name="tarball_label">Tarball</string>
@@ -203,6 +205,9 @@
     <string name="virgl_extra_flags_placeholder">e.g. --multi-clients --angle-vulkan</string>
     <string name="selinux_permissive">SELinux Permissive</string>
     <string name="selinux_permissive_description">Set SELinux permissive</string>
+    <string name="allow_userns">Allow User Namespaces</string>
+    <string name="allow_userns_description">Allow unprivileged user namespaces, which flatpak requires. It may also solve some anland producers running slow. However you may be vulnerable to certain exploits like Fragnesia without a patched kernel.</string>
+    <string name="allow_userns_description_not_supported">Not supported. CONFIG_USER_NS not enabled in kernel.</string>
     <string name="run_at_boot">Run at Boot</string>
     <string name="run_at_boot_description">Start container on boot</string>
     <string name="enable_anland">Anland Display</string>
