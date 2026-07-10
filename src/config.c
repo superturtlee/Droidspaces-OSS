@@ -90,10 +90,6 @@ void parse_privileged(const char *value, struct ds_config *cfg) {
 
     token = strtok_r(NULL, ",", &saveptr);
   }
-
-  if (cfg->userns_allowed) {
-    cfg->privileged_mask |= DS_PRIV_USERNS;
-  }
 }
 
 static void parse_bind_mounts(const char *value, struct ds_config *cfg) {
@@ -233,7 +229,7 @@ int ds_config_load(const char *config_path, struct ds_config *cfg) {
   free_config_unknown_lines(cfg);
 
   cfg->config_file_existed = 1;
-
+  cfg->privileged_mask = 0; /* Reset to default on load */
   char line[2048];
   int line_num = 0;
 
@@ -578,6 +574,10 @@ int ds_config_load(const char *config_path, struct ds_config *cfg) {
        * survives ds_config_save() unchanged. */
       add_unknown_line(cfg, line);
     }
+  }
+
+  if (cfg->userns_allowed){
+    cfg->privileged_mask |= DS_PRIV_USERNS;
   }
 
   fclose(f);

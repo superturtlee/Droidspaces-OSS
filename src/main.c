@@ -1074,6 +1074,10 @@ int main(int argc, char **argv) {
     }
   }
 
+  if (cfg.userns_allowed){
+    cfg.privileged_mask |= DS_PRIV_USERNS;
+  }
+
   if (optind >= argc) {
     ds_error(C_BOLD "Missing command" C_RESET);
     ds_log("Run '" C_BOLD "%s help" C_RESET "' for usage information.",
