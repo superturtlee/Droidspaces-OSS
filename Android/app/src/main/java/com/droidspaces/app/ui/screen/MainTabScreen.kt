@@ -58,6 +58,8 @@ enum class TabItem(val titleResId: Int, val icon: androidx.compose.ui.graphics.v
 fun MainTabScreen(
     containerViewModel: ContainerViewModel,
     skipInitialRefresh: Boolean = false,
+    requestedTab: TabItem? = null,
+    onRequestedTabConsumed: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToInstallation: () -> Unit = {},
     onNavigateToContainerInstallation: (android.net.Uri) -> Unit = {},
@@ -76,6 +78,16 @@ fun MainTabScreen(
     val tabs = remember { TabItem.values() }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { tabs.size })
     val selectedTab = tabs[pagerState.currentPage]
+
+    // Jump to the tab requested by a launcher shortcut, then clear the request.
+    LaunchedEffect(requestedTab) {
+        val target = requestedTab ?: return@LaunchedEffect
+        val index = tabs.indexOf(target)
+        if (index >= 0) {
+            pagerState.scrollToPage(index)
+        }
+        onRequestedTabConsumed()
+    }
 
     // Track which container has its action drawer expanded (hoisted for global collapse)
     var expandedContainerName by rememberSaveable { mutableStateOf<String?>(null) }

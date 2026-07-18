@@ -24,7 +24,17 @@ import com.droidspaces.app.ui.theme.rememberThemeState
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        const val ACTION_SHORTCUT_CONTAINERS = "com.droidspaces.app.action.SHORTCUT_CONTAINERS"
+        const val ACTION_SHORTCUT_PANEL = "com.droidspaces.app.action.SHORTCUT_PANEL"
+        const val ACTION_SHORTCUT_SETTINGS = "com.droidspaces.app.action.SHORTCUT_SETTINGS"
+    }
+
     private var isLoading by mutableStateOf(false)
+
+    // Deep-link target from a launcher long-press shortcut ("containers" / "panel"
+    // / "settings"), consumed once by DroidspacesNavigation then reset to null.
+    private var pendingShortcut by mutableStateOf<String?>(null)
 
     // ── POST_NOTIFICATIONS permission (Android 13+ / API 33+) ─────────────────
     // Samsung's SecFgsManagerController suppresses any FGS notification from apps
@@ -107,6 +117,12 @@ class MainActivity : AppCompatActivity() {
         // suppressed by Samsung's notification manager before it starts.
         requestNotificationPermission()
 
+        // Skip shortcut handling when the activity is relaunched from Recents,
+        // otherwise the stale shortcut intent would re-fire the deep link.
+        if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) {
+            handleIntent(intent)
+        }
+
         // Render UI immediately - no blocking operations
         setContent {
             ThemeWrapper {
@@ -116,10 +132,27 @@ class MainActivity : AppCompatActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     DroidspacesNavigation(
-                        onContentReady = { isLoading = false }
+                        onContentReady = { isLoading = false },
+                        pendingShortcut = pendingShortcut,
+                        onShortcutHandled = { pendingShortcut = null }
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent) {
+        pendingShortcut = when (intent.action) {
+            ACTION_SHORTCUT_CONTAINERS -> "containers"
+            ACTION_SHORTCUT_PANEL -> "panel"
+            ACTION_SHORTCUT_SETTINGS -> "settings"
+            else -> pendingShortcut
         }
     }
 }

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Containers tab -->
+    <shortcut
+        android:shortcutId="containers"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_containers"
+        android:shortcutShortLabel="@string/containers"
+        android:shortcutLongLabel="@string/containers">
+        <intent
+            android:action="com.droidspaces.app.action.SHORTCUT_CONTAINERS"
+            android:targetPackage="com.droidspaces.app"
+            android:targetClass="com.droidspaces.app.MainActivity" />
+    </shortcut>
+
+    <!-- Panel tab -->
+    <shortcut
+        android:shortcutId="panel"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_panel"
+        android:shortcutShortLabel="@string/panel"
+        android:shortcutLongLabel="@string/panel">
+        <intent
+            android:action="com.droidspaces.app.action.SHORTCUT_PANEL"
+            android:targetPackage="com.droidspaces.app"
+            android:targetClass="com.droidspaces.app.MainActivity" />
+    </shortcut>
+
+    <!-- Settings -->
+    <shortcut
+        android:shortcutId="settings"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_settings"
+        android:shortcutShortLabel="@string/settings"
+        android:shortcutLongLabel="@string/settings">
+        <intent
+            android:action="com.droidspaces.app.action.SHORTCUT_SETTINGS"
+            android:targetPackage="com.droidspaces.app"
+            android:targetClass="com.droidspaces.app.MainActivity" />
+    </shortcut>
+
+</shortcuts>

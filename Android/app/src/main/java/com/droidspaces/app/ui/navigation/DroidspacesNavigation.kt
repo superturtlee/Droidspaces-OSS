@@ -21,6 +21,7 @@ import com.droidspaces.app.util.Constants
 import com.droidspaces.app.util.AnimationUtils
 import com.droidspaces.app.ui.screen.InstallationScreen
 import com.droidspaces.app.ui.screen.MainTabScreen
+import com.droidspaces.app.ui.screen.TabItem
 import com.droidspaces.app.ui.screen.RootCheckScreen
 import com.droidspaces.app.ui.screen.SettingsScreen
 import com.droidspaces.app.ui.screen.RequirementsScreen
@@ -108,10 +109,16 @@ sealed class Screen(val route: String) {
 @Composable
 fun DroidspacesNavigation(
     navController: NavHostController = rememberNavController(),
-    onContentReady: () -> Unit = {}
+    onContentReady: () -> Unit = {},
+    pendingShortcut: String? = null,
+    onShortcutHandled: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefsManager = remember { PreferencesManager.getInstance(context) }
+
+    // Tab requested by a launcher shortcut (Containers / Panel). Fed into
+    // MainTabScreen, which scrolls the pager to it and clears the request.
+    var requestedTab by remember { mutableStateOf<TabItem?>(null) }
 
     // Shared ViewModels scoped to Activity to ensure state consistency across screens
     val activity = context as? ComponentActivity
@@ -142,6 +149,30 @@ fun DroidspacesNavigation(
                 rootStatus = RootChecker.checkRootAccess()
             }
         }
+    }
+
+    // Route a launcher long-press shortcut to its destination. Containers/Panel
+    // select a tab on the (reused) Home screen; Settings is pushed on top of it.
+    // Ignored until onboarding is complete so we never deep-link past setup.
+    LaunchedEffect(pendingShortcut) {
+        val shortcut = pendingShortcut ?: return@LaunchedEffect
+        if (prefsManager.isSetupCompleted) {
+            when (shortcut) {
+                "settings" -> navController.navigate(Screen.Settings.route) {
+                    popUpTo(Screen.Home.route) { inclusive = false }
+                    launchSingleTop = true
+                }
+                "containers", "panel" -> {
+                    requestedTab =
+                        if (shortcut == "containers") TabItem.Containers else TabItem.ControlPanel
+                    navController.navigate(Screen.Home.createRoute()) {
+                        popUpTo(Screen.Home.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            }
+        }
+        onShortcutHandled()
     }
 
     // Define animation specs - consistent 200ms for snappy feel
@@ -241,6 +272,8 @@ fun DroidspacesNavigation(
                 containerViewModel = sharedContainerViewModel,
                 // skipInitialRefresh=false when fromInstallation=true (invert the logic)
                 skipInitialRefresh = !fromInstallation,
+                requestedTab = requestedTab,
+                onRequestedTabConsumed = { requestedTab = null },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
                 },
