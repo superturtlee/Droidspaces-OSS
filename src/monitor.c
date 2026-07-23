@@ -8,6 +8,50 @@
 #include "droidspace.h"
 
 /* ---------------------------------------------------------------------------
+ * ds_console_drain - Empty the container's console PTY master.
+ *
+ * In BACKGROUND mode the monitor is the only process holding the console PTY
+ * master, and nothing reads it (foreground mode drives it from the parent via
+ * console_monitor_loop). If it is never read, a chatty container init that
+ * writes past the ~64 KiB PTY buffer blocks forever in n_tty_write and the
+ * whole container wedges. So the monitor must keep this master drained for the
+ * container's entire lifetime.
+ *
+ * Drained bytes are appended to the per-container console log when one is open
+ * (log_fd >= 0), which also makes background boot/console output visible for
+ * debugging. Draining continues even if the log write fails: keeping the PTY
+ * buffer empty is the load-bearing part; logging is best-effort.
+ *
+ * master_fd must be O_NONBLOCK so read() returns EAGAIN once drained.
+ * ---------------------------------------------------------------------------*/
+static void ds_console_drain(int master_fd, int log_fd, size_t *logged) {
+  char buf[4096];
+  ssize_t n;
+
+  while ((n = read(master_fd, buf, sizeof(buf))) > 0) {
+    if (log_fd < 0)
+      continue;
+
+    /* Bound the console log: truncate at 2 MiB. The fd was opened O_APPEND,
+     * so subsequent writes still land correctly after the truncation. */
+    if (logged && *logged >= 2u * 1024 * 1024) {
+      if (ftruncate(log_fd, 0) == 0)
+        *logged = 0;
+    }
+
+    size_t off = 0;
+    while (off < (size_t)n) {
+      ssize_t w = write(log_fd, buf + off, (size_t)n - off);
+      if (w <= 0)
+        break;
+      off += (size_t)w;
+    }
+    if (logged)
+      *logged += off;
+  }
+}
+
+/* ---------------------------------------------------------------------------
  * ds_monitor_run - Supervisor process for a single container instance.
  *
  * Called immediately after fork() in start_rootfs(). Never returns - always
@@ -149,6 +193,33 @@ void ds_monitor_run(struct ds_config *cfg, int sync_pipe_write) {
     ds_die("unshare failed: %s", strerror(errno));
 
   int stdio_redirected = 0;
+
+  /* Background console-drain setup (see ds_console_drain).
+   * Runs once, before the reboot loop, so a single log fd survives internal
+   * reboot cycles. In background mode the monitor is the only reader of the
+   * console PTY master: make it non-blocking and open a per-container console
+   * log so the heartbeat loop below keeps the PTY buffer drained. Foreground
+   * mode leaves the master untouched - the parent's console_monitor_loop
+   * drives it. */
+  int console_log_fd = -1;
+  size_t console_logged = 0;
+  if (!cfg->foreground && cfg->console.master >= 0) {
+    int fl = fcntl(cfg->console.master, F_GETFL, 0);
+    if (fl >= 0)
+      (void)fcntl(cfg->console.master, F_SETFL, fl | O_NONBLOCK);
+
+    char safe_name[256];
+    char log_dir[PATH_MAX];
+    char log_path[PATH_MAX];
+    sanitize_container_name(cfg->container_name, safe_name, sizeof(safe_name));
+    snprintf(log_dir, sizeof(log_dir), "%.2048s/" DS_LOGS_SUBDIR "/%.256s",
+             get_workspace_dir(), safe_name);
+    mkdir_p(log_dir, 0755);
+    snprintf(log_path, sizeof(log_path), "%.4080s/console", log_dir);
+    rotate_log(log_path, 2 * 1024 * 1024);
+    console_log_fd =
+        open(log_path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+  }
 
   /* Reboot-aware boot loop
    * Each iteration forks an intermediate child that creates a fresh PID
@@ -500,14 +571,35 @@ reboot_loop:;
 
       ds_virtualize_update(cfg);
 
+      /* Poll the signalfd and, in background mode, the console PTY master.
+       * poll() wakes immediately when the master becomes readable, so draining
+       * is effectively real-time - a container init that fills the PTY buffer
+       * is unblocked at once instead of wedging forever in n_tty_write. */
+      struct pollfd pfds[2];
+      int npfd = 0;
+      int sfd_slot = -1;
+      int con_slot = -1;
       if (sfd >= 0) {
-        struct pollfd pfd = {.fd = sfd, .events = POLLIN};
-        poll(&pfd, 1, 500);
-        if (pfd.revents & POLLIN) {
+        pfds[npfd].fd = sfd;
+        pfds[npfd].events = POLLIN;
+        sfd_slot = npfd++;
+      }
+      if (!cfg->foreground && cfg->console.master >= 0) {
+        pfds[npfd].fd = cfg->console.master;
+        pfds[npfd].events = POLLIN;
+        con_slot = npfd++;
+      }
+      if (npfd > 0) {
+        poll(pfds, (nfds_t)npfd, 500);
+        if (sfd_slot >= 0 && (pfds[sfd_slot].revents & POLLIN)) {
           struct signalfd_siginfo si;
           while (read(sfd, &si, sizeof(si)) == (ssize_t)sizeof(si))
             ; /* drain */
         }
+        if (con_slot >= 0 &&
+            (pfds[con_slot].revents & (POLLIN | POLLHUP | POLLERR)))
+          ds_console_drain(cfg->console.master, console_log_fd,
+                           &console_logged);
       } else {
         usleep(500000);
       }
@@ -673,6 +765,12 @@ reboot_loop:;
   cleanup_container_resources(cfg, 0, 0, 0);
 
 monitor_cleanup_and_exit:
+  /* Capture any final console output, then close the background console log. */
+  if (!cfg->foreground && cfg->console.master >= 0)
+    ds_console_drain(cfg->console.master, console_log_fd, &console_logged);
+  if (console_log_fd >= 0)
+    close(console_log_fd);
+
   /* Free dynamically allocated configuration members before exit */
   ds_config_free(cfg);
   _exit(WIFEXITED(status) ? WEXITSTATUS(status) : 0);
