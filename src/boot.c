@@ -80,6 +80,38 @@ void ds_apply_capability_hardening(int hw_access, int privileged_mask) {
   ds_log("[SEC] Bounding set hardened (dropped %d caps).", total_dropped);
 }
 
+/*
+ * ds_disable_kernelsu()
+ *
+ * If running on a KernelSU-patched kernel, irrevocably drop KSU capability
+ * for this process and all fork/exec children. Afterwards is_manager() and
+ * is_allow_uid() are always false, every KSU supercall ioctl returns -EPERM,
+ * the reboot magic no longer installs a [ksu_driver] fd, and setresuid no
+ * longer auto-installs an fd - closing the KSU supervisor-call escape from
+ * inside the container (manager-uid impersonation, SET_SEPOLICY, etc.).
+ *
+ * Must be called BEFORE seccomp is applied (the fd is obtained via the
+ * reboot(2) magic, which seccomp may filter) and BEFORE execve(init) so the
+ * whole process tree inherits the disabled state.
+ *
+ * No-op on kernels without KernelSU (reboot magic yields no fd).
+ */
+void ds_disable_kernelsu(void) {
+  int fd = -1;
+  syscall(SYS_reboot, 0xDEADBEEF, 0xCAFEBABE, 0, &fd);
+  if (fd < 0)
+    return; /* no KernelSU present */
+
+  /* KSU_IOCTL_DISABLE_KSU = _IO('K', 22) = 0x4b16, perm: only_root */
+  if (ioctl(fd, 0x4b16) < 0) {
+    ds_warn("[SEC] KernelSU detected but DISABLE_KSU failed: %s",
+            strerror(errno));
+  } else {
+    ds_log("[SEC] KernelSU capability disabled for container process tree.");
+  }
+  close(fd);
+}
+
 int internal_boot(struct ds_config *cfg) {
   /* Defensive check: ensure configuration is valid */
   if (!cfg) {
@@ -524,6 +556,12 @@ int internal_boot(struct ds_config *cfg) {
       ds_warn("Failed to create profile.d symlink: %s", strerror(errno));
     }
   }
+
+  /* 23c. Disable KernelSU capability if present.
+   * Must run BEFORE seccomp (the [ksu_driver] fd is obtained via the
+   * reboot(2) magic, which seccomp may filter) and BEFORE execve(init) so
+   * the whole container process tree inherits the disabled state. */
+  ds_disable_kernelsu();
 
   /* 23c. Apply security hardening (capabilities)
    * Apply security hardening (capabilities and seccomp)

@@ -893,6 +893,9 @@ void write_plain_env_file(const char *src, const char *dst);
  * ---------------------------------------------------------------------------*/
 
 void ds_apply_capability_hardening(int hw_access, int privileged_mask);
+/* If KernelSU is present, drop its capability for the current process and all
+ * children (per-task thread flag, fork-inherited, irreversible). No-op otherwise. */
+void ds_disable_kernelsu(void);
 int internal_boot(struct ds_config *cfg);
 
 /* ---------------------------------------------------------------------------
