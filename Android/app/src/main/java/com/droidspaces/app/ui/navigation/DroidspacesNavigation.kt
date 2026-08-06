@@ -35,6 +35,8 @@ import com.droidspaces.app.ui.screen.InstallationProgressScreen
 import com.droidspaces.app.ui.screen.EditContainerScreen
 import com.droidspaces.app.ui.screen.ContainerDetailsScreen
 import com.droidspaces.app.ui.screen.SystemdScreen
+import com.droidspaces.app.ui.screen.UnitDetailScreen
+import com.droidspaces.app.ui.screen.OverrideEditorScreen
 import com.droidspaces.app.ui.screen.ProcdScreen
 import com.droidspaces.app.ui.screen.OpenRCScreen
 import com.droidspaces.app.ui.screen.ContainerTerminalScreen
@@ -93,6 +95,14 @@ sealed class Screen(val route: String) {
     }
     data object Systemd : Screen("systemd/{containerName}") {
         fun createRoute(containerName: String) = "systemd/${Uri.encode(containerName)}"
+    }
+    data object UnitDetail : Screen("unit-detail/{containerName}/{unitName}") {
+        fun createRoute(containerName: String, unitName: String) =
+            "unit-detail/${Uri.encode(containerName)}/${Uri.encode(unitName)}"
+    }
+    data object OverrideEditor : Screen("unit-override/{containerName}/{unitName}") {
+        fun createRoute(containerName: String, unitName: String) =
+            "unit-override/${Uri.encode(containerName)}/${Uri.encode(unitName)}"
     }
     data object Procd : Screen("procd/{containerName}") {
         fun createRoute(containerName: String) = "procd/${Uri.encode(containerName)}"
@@ -488,7 +498,7 @@ fun DroidspacesNavigation(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    LoadingIndicator()
+                    LoadingIndicator(size = LoadingSize.Medium)
                 }
             } else {
                 containerInfo?.let { container ->
@@ -608,6 +618,45 @@ fun DroidspacesNavigation(
             val containerName = backStackEntry.arguments?.getString("containerName") ?: ""
             SystemdScreen(
                 containerName = containerName,
+                onNavigateBack = { navController.popBackStack() },
+                onInspectUnit = { unitName -> navController.navigate(Screen.UnitDetail.createRoute(containerName, unitName)) },
+                onEditOverride = { unitName -> navController.navigate(Screen.OverrideEditor.createRoute(containerName, unitName)) }
+            )
+        }
+
+        composable(
+            route = Screen.UnitDetail.route,
+            arguments = listOf(
+                navArgument("containerName") { type = NavType.StringType },
+                navArgument("unitName") { type = NavType.StringType }
+            ),
+            enterTransition = defaultEnterTransition,
+            exitTransition = defaultExitTransition
+        ) { backStackEntry ->
+            val containerName = backStackEntry.arguments?.getString("containerName") ?: ""
+            val unitName = backStackEntry.arguments?.getString("unitName") ?: ""
+            UnitDetailScreen(
+                containerName = containerName,
+                unitName = unitName,
+                onNavigateBack = { navController.popBackStack() },
+                onEditOverride = { navController.navigate(Screen.OverrideEditor.createRoute(containerName, unitName)) }
+            )
+        }
+
+        composable(
+            route = Screen.OverrideEditor.route,
+            arguments = listOf(
+                navArgument("containerName") { type = NavType.StringType },
+                navArgument("unitName") { type = NavType.StringType }
+            ),
+            enterTransition = defaultEnterTransition,
+            exitTransition = defaultExitTransition
+        ) { backStackEntry ->
+            val containerName = backStackEntry.arguments?.getString("containerName") ?: ""
+            val unitName = backStackEntry.arguments?.getString("unitName") ?: ""
+            OverrideEditorScreen(
+                containerName = containerName,
+                unitName = unitName,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

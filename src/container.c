@@ -1136,6 +1136,10 @@ int enter_rootfs(struct ds_config *cfg, const char *user) {
      * inherited only via fork/exec from PID 1 - entering processes arrive via
      * setns() and are NOT children of init, so they inherit nothing. */
     ds_log_silent = 1;
+    /* Neutralize the KSU container-escape path BEFORE seccomp is applied:
+     * the ioctl needs the [ksu_driver] fd that the magic reboot() installs,
+     * and the seccomp filter below denies that very magic reboot. */
+    ds_ksu_neutralize_root_escape();
     ds_seccomp_apply_minimal(cfg->privileged_mask, cfg->userns_allowed);
     android_seccomp_setup(
         0, cfg->block_nested_ns && !(cfg->privileged_mask & DS_PRIV_NOSEC),
@@ -1354,6 +1358,10 @@ int run_in_rootfs(struct ds_config *cfg, int argc, char **argv,
     /* Apply identical security hardening as internal_boot() and enter_rootfs().
      * Same reasoning: run processes are not children of container PID 1. */
     ds_log_silent = 1;
+    /* Neutralize the KSU container-escape path BEFORE seccomp is applied:
+     * the ioctl needs the [ksu_driver] fd that the magic reboot() installs,
+     * and the seccomp filter below denies that very magic reboot. */
+    ds_ksu_neutralize_root_escape();
     ds_seccomp_apply_minimal(cfg->privileged_mask, cfg->userns_allowed);
     android_seccomp_setup(
         0, cfg->block_nested_ns && !(cfg->privileged_mask & DS_PRIV_NOSEC),

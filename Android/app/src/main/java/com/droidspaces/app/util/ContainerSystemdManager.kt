@@ -61,6 +61,16 @@ object ContainerSystemdManager {
     }
 
     /**
+     * Result of inspecting a single unit: parsed `systemctl show` properties,
+     * raw `systemctl status` text, and its dependency tree.
+     */
+    data class UnitInspection(
+        val properties: Map<String, String>,
+        val statusText: List<String>,
+        val dependencies: List<String>
+    )
+
+    /**
      * Command result with exit code for proper handling.
      */
     data class CommandResult(
@@ -321,4 +331,98 @@ object ContainerSystemdManager {
 
     suspend fun unmaskService(containerName: String, serviceName: String) =
         runSystemctl(containerName, "unmask", serviceName)
+
+    // ── Unit inspection ──────────────────────────────────────────────────────
+
+    /**
+     * Inspect a single unit: key properties (via `systemctl show -p`), the raw
+     * `systemctl status` text, and its dependency tree. Returns null if the
+     * unit name fails the shared safety check.
+     */
+    suspend fun inspectUnit(containerName: String, unitName: String): UnitInspection? {
+        if (!ServiceManagerBase.isSafeServiceName(unitName)) return null
+
+        val propsResult = executeSystemctlCommand(
+            containerName,
+            "show $unitName --no-pager -p " +
+                "Description,LoadState,ActiveState,SubState,UnitFileState,FragmentPath," +
+                "DropInPaths,MainPID,ExecMainStartTimestamp,Restart,MemoryCurrent,CPUUsageNSec"
+        )
+        val statusResult = executeSystemctlCommand(containerName, "status $unitName --no-pager -l")
+        val depsResult = executeSystemctlCommand(containerName, "list-dependencies $unitName --no-pager --plain")
+
+        val properties = propsResult.output
+            .mapNotNull { line ->
+                val idx = line.indexOf('=')
+                if (idx > 0) line.substring(0, idx) to line.substring(idx + 1) else null
+            }
+            .toMap()
+
+        return UnitInspection(
+            properties = properties,
+            statusText = statusResult.output,
+            dependencies = depsResult.output.map { it.trim() }.filter { it.isNotBlank() }
+        )
+    }
+
+    // ── Override (drop-in) management ────────────────────────────────────────
+    // Mirrors `systemctl edit <unit>` — writes/reads/removes
+    // /etc/systemd/system/<unit>.d/override.conf inside the container.
+
+    private fun overrideDirPath(unitName: String) = "/etc/systemd/system/$unitName.d"
+    private fun overridePath(unitName: String) = "${overrideDirPath(unitName)}/override.conf"
+
+    /** Read the current override.conf for a unit. Null if unsafe, missing, or read fails. */
+    suspend fun getOverrideConf(containerName: String, unitName: String): String? =
+        withContext(Dispatchers.IO) {
+            if (!ServiceManagerBase.isSafeServiceName(unitName)) return@withContext null
+            try {
+                val path = overridePath(unitName)
+                val cmd = "${Constants.DROIDSPACES_BINARY_PATH} --name=${ContainerCommandBuilder.quote(containerName)} " +
+                    "run '[ -f $path ] && cat $path'"
+                val result = Shell.cmd(cmd).exec()
+                if (result.isSuccess && result.out.isNotEmpty()) result.out.joinToString("\n") else null
+            } catch (e: Exception) {
+                Log.e(TAG, "Error reading override.conf for $unitName", e)
+                null
+            }
+        }
+
+    /**
+     * Write (create or replace) override.conf for a unit, then reload systemd.
+     * Content is base64-streamed — same safe pattern [runScript] already uses —
+     * so arbitrary user-typed conf text (quotes, `$`, backticks, etc.) can never
+     * break out of the single-quoted `run '...'` shell payload.
+     */
+    suspend fun setOverrideConf(
+        containerName: String,
+        unitName: String,
+        content: String
+    ): CommandResult = withContext(Dispatchers.IO) {
+        if (!ServiceManagerBase.isSafeServiceName(unitName)) {
+            return@withContext CommandResult(2, emptyList(), listOf("Invalid unit name: $unitName"))
+        }
+        val dir = overrideDirPath(unitName)
+        val path = overridePath(unitName)
+        val b64 = Base64.encodeToString(content.toByteArray(), Base64.NO_WRAP)
+
+        val cmd = "${Constants.DROIDSPACES_BINARY_PATH} --name=${ContainerCommandBuilder.quote(containerName)} " +
+            "run 'mkdir -p $dir && echo $b64 | base64 -d > $path && systemctl daemon-reload 2>&1'"
+
+        val result = Shell.cmd(cmd).exec()
+        CommandResult(result.code, result.out, result.err)
+    }
+
+    /** Remove override.conf (and its drop-in dir, if now empty) then reload systemd. */
+    suspend fun deleteOverrideConf(containerName: String, unitName: String): CommandResult =
+        withContext(Dispatchers.IO) {
+            if (!ServiceManagerBase.isSafeServiceName(unitName)) {
+                return@withContext CommandResult(2, emptyList(), listOf("Invalid unit name: $unitName"))
+            }
+            val dir = overrideDirPath(unitName)
+            val cmd = "${Constants.DROIDSPACES_BINARY_PATH} --name=${ContainerCommandBuilder.quote(containerName)} " +
+                "run 'rm -f ${overridePath(unitName)} && rmdir --ignore-fail-on-non-empty $dir 2>/dev/null; systemctl daemon-reload 2>&1'"
+            val result = Shell.cmd(cmd).exec()
+            CommandResult(result.code, result.out, result.err)
+        }
 }

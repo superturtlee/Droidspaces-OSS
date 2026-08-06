@@ -1,6 +1,8 @@
 package com.droidspaces.app.ui.screen
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -14,7 +16,11 @@ import com.droidspaces.app.util.ContainerSystemdManager
 
 private fun ContainerSystemdManager.CommandResult.toInit() = InitCommandResult(isSuccess, output, error)
 
-private fun ContainerSystemdManager.ServiceInfo.toRow(containerName: String): InitServiceRow {
+private fun ContainerSystemdManager.ServiceInfo.toRow(
+    containerName: String,
+    onInspectUnit: (String) -> Unit,
+    onEditOverride: (String) -> Unit,
+): InitServiceRow {
     val uiStatus = when (status) {
         ContainerSystemdManager.ServiceStatus.ENABLED_RUNNING -> InitServiceUiStatus.ENABLED_RUNNING
         ContainerSystemdManager.ServiceStatus.ENABLED_STOPPED -> InitServiceUiStatus.ENABLED_STOPPED
@@ -35,8 +41,10 @@ private fun ContainerSystemdManager.ServiceInfo.toRow(containerName: String): In
         enableDisable = { (if (isEnabled) ContainerSystemdManager.disableService(containerName, name) else ContainerSystemdManager.enableService(containerName, name)).toInit() },
         unmask = if (isMasked) { { ContainerSystemdManager.unmaskService(containerName, name).toInit() } } else null,
         menu = buildList {
-            if (isRunning) add(InitServiceMenuAction(R.string.restart_service, Icons.Default.Refresh) { ContainerSystemdManager.restartService(containerName, name).toInit() })
-            add(InitServiceMenuAction(R.string.mask_service, Icons.Default.Lock) { ContainerSystemdManager.maskService(containerName, name).toInit() })
+            if (isRunning) add(InitServiceMenuAction.Command(R.string.restart_service, Icons.Default.Refresh) { ContainerSystemdManager.restartService(containerName, name).toInit() })
+            add(InitServiceMenuAction.Command(R.string.mask_service, Icons.Default.Lock) { ContainerSystemdManager.maskService(containerName, name).toInit() })
+            add(InitServiceMenuAction.Navigate(R.string.inspect_unit, Icons.Default.Info) { onInspectUnit(name) })
+            add(InitServiceMenuAction.Navigate(R.string.edit_override, Icons.Default.Edit) { onEditOverride(name) })
         }
     )
 }
@@ -45,7 +53,9 @@ private fun ContainerSystemdManager.ServiceInfo.toRow(containerName: String): In
 @Composable
 fun SystemdScreen(
     containerName: String,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onInspectUnit: (String) -> Unit,
+    onEditOverride: (String) -> Unit,
 ) {
     val context = LocalContext.current
     LaunchedEffect(Unit) { ContainerSystemdManager.initialize(context) }
@@ -66,7 +76,7 @@ fun SystemdScreen(
         titleRes = R.string.systemd_services,
         onNavigateBack = onNavigateBack,
         isAvailable = { cn -> ContainerSystemdManager.isSystemdAvailable(cn) },
-        fetchRows = { cn -> ContainerSystemdManager.getAllServices(cn).map { it.toRow(cn) } },
+        fetchRows = { cn -> ContainerSystemdManager.getAllServices(cn).map { it.toRow(cn, onInspectUnit, onEditOverride) } },
         filters = filters,
         defaultFilterId = "RUNNING",
     )

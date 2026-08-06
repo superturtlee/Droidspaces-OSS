@@ -41,6 +41,8 @@ import com.droidspaces.app.ui.terminal.virtualkeys.VirtualKeysListener
 import com.droidspaces.app.ui.terminal.virtualkeys.VirtualKeysView
 import com.droidspaces.app.util.AnimationUtils
 import com.droidspaces.app.util.ContainerOSInfoManager
+import com.droidspaces.app.ui.util.LoadingIndicator
+import com.droidspaces.app.ui.util.LoadingSize
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import java.lang.ref.WeakReference
@@ -279,7 +281,7 @@ fun ContainerTerminalScreen(
         ) {
             if (binder == null || tabs.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    LoadingIndicator(size = LoadingSize.Medium)
                 }
             } else {
                 tabs.forEach { tab ->

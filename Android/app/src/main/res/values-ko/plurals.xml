@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="container_count">
+        <item quantity="other">%d개 컨테이너</item>
+    </plurals>
+    <plurals name="commit_count">
+        <item quantity="other">%d개 커밋</item>
+    </plurals>
+    <plurals name="notification_sessions_running">
+        <item quantity="other">%d개 세션 실행중</item>
+    </plurals>
+</resources>

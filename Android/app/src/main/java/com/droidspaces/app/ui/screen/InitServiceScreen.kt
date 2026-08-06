@@ -62,12 +62,25 @@ enum class InitServiceUiStatus {
 /** Manager-agnostic command result. */
 data class InitCommandResult(val isSuccess: Boolean, val output: List<String>, val error: List<String>)
 
-/** An overflow-menu action (restart / mask / reload / …). */
-data class InitServiceMenuAction(
-    val labelRes: Int,
-    val icon: ImageVector,
-    val run: suspend () -> InitCommandResult,
-)
+/**
+ * An overflow-menu action. [Command] fires a suspend action (restart / mask /
+ * reload / …) through the shared executeAction pipeline (progress dialog +
+ * snackbar + refetch). [Navigate] opens a dedicated screen (e.g. unit
+ * inspection, override.conf editor) and does not touch the command pipeline.
+ */
+sealed class InitServiceMenuAction(val labelRes: Int, val icon: ImageVector) {
+    class Command(
+        labelRes: Int,
+        icon: ImageVector,
+        val run: suspend () -> InitCommandResult,
+    ) : InitServiceMenuAction(labelRes, icon)
+
+    class Navigate(
+        labelRes: Int,
+        icon: ImageVector,
+        val onClick: () -> Unit,
+    ) : InitServiceMenuAction(labelRes, icon)
+}
 
 /** One service row plus the actions applicable to it. */
 data class InitServiceRow(
@@ -454,7 +467,7 @@ private fun InitServiceCard(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(20.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                 ) {
                     Row(modifier = Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -532,7 +545,13 @@ private fun InitServiceCard(
                                                 DropdownMenuItem(
                                                     text = { Text(context.getString(item.labelRes)) },
                                                     leadingIcon = { Icon(item.icon, null) },
-                                                    onClick = { showMenu = false; onAction(context.getString(item.labelRes), item.run) }
+                                                    onClick = {
+                                                        showMenu = false
+                                                        when (item) {
+                                                            is InitServiceMenuAction.Command -> onAction(context.getString(item.labelRes), item.run)
+                                                            is InitServiceMenuAction.Navigate -> item.onClick()
+                                                        }
+                                                    }
                                                 )
                                             }
                                         }

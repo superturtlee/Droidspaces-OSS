@@ -269,7 +269,26 @@ if $TEST -f "$ROOTFS_PATH/etc/dhcpcd.conf"; then
     fi
 fi
 
-# --- 4. Miscellaneous Fixes ---
+# --- 4. Devuan-specific Fixes ---
+
+if $TEST -f "$ROOTFS_PATH/etc/os-release" &&
+   $GREP -q '^ID=devuan$' "$ROOTFS_PATH/etc/os-release"; then
+    log "Devuan detected, patching umount init scripts..."
+
+    for f in "$ROOTFS_PATH"/etc/init.d/umount*; do
+        $TEST -f "$f" || continue
+
+        # Avoid inserting the workaround multiple times
+        if ! $GREP -q '^exit 0$' "$f"; then
+            $SED -i '/^### END INIT INFO$/a exit 0' "$f"
+        fi
+
+        $CHMOD +x "$f"
+    done
+fi
+
+
+# --- 5. Miscellaneous Fixes ---
 
 # Configure logrotate
 log "Configuring logrotate for Android..."

@@ -593,6 +593,15 @@ int android_seccomp_setup(int is_systemd, int block_nested_ns,
                           int privileged_mask);
 int ds_seccomp_apply_minimal(int privileged_mask, int userns_allowed);
 
+/* KernelSU container-escape hardening: ask KSU to mark the current thread
+ * (TIF_KSU_DISABLE_ESCAPE_WITH_ROOT via KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT)
+ * so escape_with_root_profile() refuses to escalate it.  Best-effort,
+ * silent no-op on non-KSU kernels.  Must run BEFORE ds_seccomp_apply_minimal,
+ * whose magic-reboot block would otherwise deny the very reboot() this uses
+ * to obtain its fd.  The seccomp block is the load-bearing (tree-wide)
+ * barrier; this is per-thread defense-in-depth. */
+void ds_ksu_neutralize_root_escape(void);
+
 /* SELinux + Termux privilege helpers */
 int get_selinux_context(const char *path, char *buf, size_t size);
 const char *ds_extract_mls(const char *ctx);

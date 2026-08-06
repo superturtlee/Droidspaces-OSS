@@ -20,6 +20,20 @@
 #define AUDIT_ARCH_RISCV64 0xC00000F3u
 #endif
 
+/* KernelSU container-escape hardening constants.
+ *
+ * KSU installs its [ksu_driver] anon fd via a kprobe on reboot(): when
+ * reboot() is called with the magic pair (0xDEADBEEF, 0xCAFEBABE) it
+ * returns -EINVAL (bad magic, as far as the kernel is concerned) but a
+ * task_work callback installs the fd as a side effect.  That fd is the
+ * only handle for issuing KSU ioctls, including GRANT_ROOT - the
+ * container-escape primitive that installs full-root creds and disables
+ * seccomp.  The ioctl below (only_root perm) sets TIF_KSU_DISABLE_ESCAPE_
+ * WITH_ROOT on the calling thread so escape_with_root_profile() aborts. */
+#define DS_KSU_INSTALL_MAGIC1 0xDEADBEEFu
+#define DS_KSU_INSTALL_MAGIC2 0xCAFEBABEu
+#define DS_KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT _IO('K', 21)
+
 /* ---------------------------------------------------------------------------
  * Android System Call Filtering (Seccomp)
  * ---------------------------------------------------------------------------*/
@@ -154,6 +168,35 @@ int ds_seccomp_apply_minimal(int privileged_mask, int userns_allowed) {
     /* Reload nr for any rules that follow this block. */
     filter[curr++] = (struct sock_filter)BPF_STMT(
         BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr));
+    /* 9b. KernelSU magic-reboot fd-install suppression.
+     *
+     * KSU hooks reboot() via kprobe and, when invoked with the magic pair
+     * (0xDEADBEEF, 0xCAFEBABE), installs an anonymous [ksu_driver] fd -
+     * the only handle for KSU ioctls, including GRANT_ROOT, which installs
+     * full-root creds and disables seccomp (the container-escape primitive).
+     * Deny reboot() only when BOTH args match the KSU magic; every other
+     * reboot() (already gated by CAP_SYS_BOOT in-kernel) is unaffected, and
+     * wrong-magic reboot() already returns -EINVAL anyway.
+     *
+     * Pairs with ds_ksu_neutralize_root_escape(), which must run BEFORE this
+     * filter is applied (it obtains its fd through this same magic reboot). */
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr));
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_reboot, 0, 6);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0]));
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  DS_KSU_INSTALL_MAGIC1, 0, 3);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[1]));
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  DS_KSU_INSTALL_MAGIC2, 0, 1);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA));
+    /* Reload nr for any rules that follow this block. */
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr));
     /*
      * 10. Block host clock modification syscalls.
      *
@@ -214,6 +257,26 @@ int ds_seccomp_apply_minimal(int privileged_mask, int userns_allowed) {
     return -1;
   }
   return 0;
+}
+
+void ds_ksu_neutralize_root_escape(void) {
+  int fd = -1;
+  /* KSU kprobes reboot(); with the magic pair it returns -EINVAL but a
+   * task_work callback installs the [ksu_driver] fd.  On non-KSU kernels
+   * this is just an -EINVAL reboot() and fd stays -1. */
+  long ret = syscall(__NR_reboot, DS_KSU_INSTALL_MAGIC1,
+                     DS_KSU_INSTALL_MAGIC2, 0, &fd);
+  (void)ret;
+  if (fd < 0)
+    return; /* KSU not present or no fd installed */
+
+  /* Mark this thread so escape_with_root_profile() aborts for it
+   * (KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT, perm: only_root). */
+  if (ioctl(fd, DS_KSU_IOCTL_DISABLE_ESCAPE_TO_ROOT, 0) == 0)
+    ds_log("[SEC] escape_with_root disabled for pid %d", (int)getpid());
+  /* fd is O_CLOEXEC, but drop it explicitly before any exec so it can
+   * never be reused by a descendant for GRANT_ROOT. */
+  close(fd);
 }
 
 /**

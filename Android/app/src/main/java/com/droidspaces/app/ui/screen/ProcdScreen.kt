@@ -32,8 +32,8 @@ private fun ContainerProcdManager.ServiceInfo.toRow(containerName: String): Init
         enableDisable = { (if (isEnabled) ContainerProcdManager.disableService(containerName, name) else ContainerProcdManager.enableService(containerName, name)).toInit() },
         unmask = null,
         menu = listOf(
-            InitServiceMenuAction(R.string.restart_service, Icons.Default.Refresh) { ContainerProcdManager.restartService(containerName, name).toInit() },
-            InitServiceMenuAction(R.string.reload_service, Icons.Default.Refresh) { ContainerProcdManager.reloadService(containerName, name).toInit() },
+            InitServiceMenuAction.Command(R.string.restart_service, Icons.Default.Refresh) { ContainerProcdManager.restartService(containerName, name).toInit() },
+            InitServiceMenuAction.Command(R.string.reload_service, Icons.Default.Refresh) { ContainerProcdManager.reloadService(containerName, name).toInit() },
         )
     )
 }

@@ -31,7 +31,7 @@ private fun ContainerOpenRCManager.ServiceInfo.toRow(containerName: String): Ini
         enableDisable = { (if (isEnabled) ContainerOpenRCManager.disableService(containerName, name) else ContainerOpenRCManager.enableService(containerName, name)).toInit() },
         unmask = null,
         menu = buildList {
-            if (isRunning) add(InitServiceMenuAction(R.string.restart_service, Icons.Default.Refresh) { ContainerOpenRCManager.restartService(containerName, name).toInit() })
+            if (isRunning) add(InitServiceMenuAction.Command(R.string.restart_service, Icons.Default.Refresh) { ContainerOpenRCManager.restartService(containerName, name).toInit() })
         }
     )
 }

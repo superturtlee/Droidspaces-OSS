@@ -36,6 +36,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.droidspaces.app.R
 import com.droidspaces.app.ui.util.ClearFocusOnClickOutside
 import com.droidspaces.app.ui.util.FocusUtils
+import com.droidspaces.app.ui.util.LoadingIndicator
+import com.droidspaces.app.ui.util.LoadingSize
 import com.droidspaces.app.ui.viewmodel.AssetDownloadState
 import com.droidspaces.app.ui.viewmodel.RepoUiState
 import com.droidspaces.app.ui.viewmodel.RootfsRepoViewModel
@@ -217,7 +219,7 @@ private fun RepoLoadingContent() {
             .height(240.dp),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator()
+        LoadingIndicator(size = LoadingSize.Medium)
     }
 }
 
