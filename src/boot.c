@@ -567,11 +567,6 @@ int internal_boot(struct ds_config *cfg) {
    * Apply security hardening (capabilities and seccomp)
    * This is done at the very end to ensure all setup tasks that might need
    * privileges (like chown/chmod or mknod) are finished. */
-  /* Neutralize the KSU container-escape path BEFORE seccomp is applied: the
-   * ioctl is delivered through the [ksu_driver] fd that the magic reboot()
-   * installs, and the seccomp filter below denies that very magic reboot.
-   * Best-effort, silent no-op on non-KSU kernels. */
-  ds_ksu_neutralize_root_escape();
   ds_seccomp_apply_minimal(cfg->privileged_mask, cfg->userns_allowed);
   android_seccomp_setup(is_systemd,
                         cfg->block_nested_ns &&
